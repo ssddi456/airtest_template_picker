@@ -9,9 +9,9 @@
     // See also https://aka.ms/tsconfig/module
     "module": "umd",
     "target": "esnext",
-    "types": [],
+    "types": ["node"],
     // For nodejs:
-    // "lib": ["esnext"],
+    "lib": ["dom", "dom.iterable", "esnext"],
     // "types": ["node"],
     // and npm install -D @types/node
 
@@ -34,9 +34,10 @@
 
     // Recommended Options
     "strict": true,
-    "jsx": "react-jsx",
+    "jsx": "react",
     "isolatedModules": false,
     "esModuleInterop": true,
+    "moduleResolution": "nodenext",
     "allowSyntheticDefaultImports": true,
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",

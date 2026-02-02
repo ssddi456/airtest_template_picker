@@ -1,3 +1,4 @@
+require("dotenv").config();
 const path = require("path");
 const rspack = require("@rspack/core");
 
@@ -11,7 +12,7 @@ const { codeInspectorPlugin } = require('code-inspector-plugin');
 module.exports = {
     mode: "development",
     entry: {
-        index: "./src/client/index.tsx",
+        index: "./src/index.tsx",
     },
     optimization: {
         minimize: false,
@@ -21,7 +22,7 @@ module.exports = {
     output: {
         filename: "[name].js",
         path: path.resolve(__dirname, "dist"),
-        publicPath: "http://localhost:3050/dist/",
+        publicPath: "/",
     },
     plugins: [
         codeInspectorPlugin({
@@ -29,11 +30,11 @@ module.exports = {
             hotKeys: ['altKey'],
             importClient: 'code',
             injectTo:[
-                path.resolve(__dirname, 'src/client/index.tsx'),
+                path.resolve(__dirname, 'src/index.tsx'),
             ]
         }),
         new HtmlRspackPlugin({
-            template: "./src/client/index.html",
+            template: "./public/index.html",
             filename: "index.html",
             chunks: ["index"],
         }),
@@ -66,12 +67,11 @@ module.exports = {
             {
                 test: /\.css$/,
                 use: [
-                    
+                    {
+                        loader: "style-loader",
+                    },
                     {
                         loader: "css-loader",
-                        options: {
-                            exportType: "css-style-sheet"
-                        }
                     },
                     "postcss-loader",
                 ],
@@ -87,7 +87,16 @@ module.exports = {
     },
     devServer: {
         hot: true,
-        port: 3000,
+        port: process.env.DEV_PORT,
+        proxy: [
+            // Proxy API requests to the backend server
+            {
+                context: ['/api', '/data/screenshots'],
+                target: `http://localhost:${process.env.API_PORT}`,
+                secure: false,
+            }
+        ]
+        
     },
     experiments: {
         cache: {
