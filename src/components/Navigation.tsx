@@ -1,34 +1,32 @@
 import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
 
-interface NavigationProps {
-  currentView: 'screenshots' | 'annotations' | 'history' | 'python';
-  onViewChange: (view: 'screenshots' | 'annotations' | 'history' | 'python') => void;
-}
+export default function Navigation() {
+  const location = useLocation();
 
-export default function Navigation({ currentView, onViewChange }: NavigationProps) {
   const views = [
-    { id: 'screenshots', label: 'Screenshots', icon: '📷' },
-    { id: 'annotations', label: 'Annotations', icon: '📝' },
-    { id: 'history', label: 'Version History', icon: '📜' },
-    { id: 'python', label: 'Python Code', icon: '🐍' },
+    { id: '/screenshots', label: '截图', icon: '📷' },
+    { id: '/annotations', label: '标注', icon: '📝' },
+    { id: '/python', label: 'Python 代码', icon: '🐍' },
   ] as const;
 
   return (
-    <nav className="flex space-x-4">
+    <nav className="flex space-x-1">
       {views.map((view) => (
-        <button
+        <Link
           key={view.id}
-          onClick={() => onViewChange(view.id as any)}
-          className={`px-4 py-2 rounded-md transition-colors duration-200 ${
-            currentView === view.id
+          to={view.id}
+          className={`px-2 py-1 transition-colors duration-200 ${
+            location.pathname.startsWith(view.id) || (view.id === '/screenshots' && location.pathname === '/')
               ? 'bg-blue-600 text-white shadow-md'
               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
           }`}
         >
           <span className="mr-2">{view.icon}</span>
           <span>{view.label}</span>
-        </button>
+        </Link>
       ))}
     </nav>
   );
 }
+

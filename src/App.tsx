@@ -1,71 +1,42 @@
-import React, { useState } from 'react';
-import type { Screenshot } from './types/index';
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
-import Navigation from './components/Navigation';
-import ScreenshotManager from './components/ScreenshotManager';
-import AnnotationEditor from './components/AnnotationEditor';
-import VersionHistory from './components/VersionHistory';
+import ScreenshotList from './components/ScreenshotList';
+import AnnotationList from './components/AnnotationList';
+import AnnotationDetail from './components/AnnotationDetail';
+import ScreenshotHistory from './components/ScreenshotHistory';
 import PythonPreview from './components/PythonPreview';
 
-type View = 'screenshots' | 'annotations' | 'history' | 'python';
-
 export default function App() {
-  const [currentView, setCurrentView] = useState<View>('screenshots');
-  const [selectedScreenshot, setSelectedScreenshot] = useState<Screenshot | null>(null);
-
   return (
     <Layout>
-      <Navigation currentView={currentView} onViewChange={setCurrentView} />
-      {currentView === 'screenshots' && (
-        <ScreenshotManager onScreenshotSelect={(screenshot) => {
-          setSelectedScreenshot(screenshot);
-          setCurrentView('annotations');
-        }} />
-      )}
-      {currentView === 'annotations' && selectedScreenshot ? (
-        <AnnotationEditor
-          screenshotId={selectedScreenshot.id}
-          screenshotName={selectedScreenshot.name}
-          screenshotPath={`/data/screenshots/${selectedScreenshot.filename}`}
-        />
-      ) : (
-        <div className="text-center py-8">
-          <p className="text-gray-600">Please select a screenshot to annotate.</p>
-          <button
-            onClick={() => setCurrentView('screenshots')}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            Go to Screenshots
-          </button>
-        </div>
-      )}
-      {currentView === 'history' && selectedScreenshot ? (
-        <VersionHistory
-          screenshotId={selectedScreenshot.id}
-          onRollback={() => {
-            loadAnnotations(selectedScreenshot.id);
-          }}
-        />
-      ) : (
-        <div className="text-center py-8">
-          <p className="text-gray-600">Please select a screenshot to view history.</p>
-          <button
-            onClick={() => setCurrentView('screenshots')}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            Go to Screenshots
-          </button>
-        </div>
-      )}
-      {currentView === 'python' && <PythonPreview />}
+      <Routes>
+        {/* 默认路由重定向到截图列表 */}
+        <Route path="/" element={<Navigate to="/screenshots" replace />} />
+        
+        {/* 截图列表页面 */}
+        <Route path="/screenshots" element={<ScreenshotList />} />
+        
+        {/* 截图标注详情页面 */}
+        <Route path="/screenshots/:id" element={<AnnotationDetail />} />
+        
+        {/* 截图历史记录页面 */}
+        <Route path="/screenshots/:id/history" element={<ScreenshotHistory />} />
+        
+        {/* 标注列表页面 */}
+        <Route path="/annotations" element={<AnnotationList />} />
+        
+        {/* 通过标注ID跳转到标注详情 */}
+        <Route path="/annotations/:id" element={<NavigateToDetail />} />
+        
+        {/* Python 代码预览页面 */}
+        <Route path="/python" element={<PythonPreview />} />
+      </Routes>
     </Layout>
   );
+}
 
-  async function loadAnnotations(screenshotId: string) {
-    // This function can be used to reload annotations after rollback
-    const response = await fetch(`/api/annotations/${screenshotId}`);
-    if (response.ok) {
-      // Annotations reloaded
-    }
-  }
+// 组件：通过标注ID跳转到对应的标注详情页面
+function NavigateToDetail() {
+  return <Navigate to="/screenshots" replace />;
 }

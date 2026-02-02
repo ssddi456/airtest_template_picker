@@ -87,6 +87,9 @@ module.exports = {
     },
     devServer: {
         hot: true,
+        historyApiFallback: {
+            index: '/'
+        },
         port: process.env.DEV_PORT,
         proxy: [
             // Proxy API requests to the backend server
