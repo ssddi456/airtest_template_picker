@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import ScreenshotList from './components/ScreenshotList';
 import AnnotationList from './components/AnnotationList';
-import AnnotationDetail from './components/AnnotationDetail';
+import PixiJSAnnotationDetail from './components/PixiJSAnnotationDetail';
 import ScreenshotHistory from './components/ScreenshotHistory';
 import PythonPreview from './components/PythonPreview';
 
@@ -13,22 +13,22 @@ export default function App() {
       <Routes>
         {/* 默认路由重定向到截图列表 */}
         <Route path="/" element={<Navigate to="/screenshots" replace />} />
-        
+
         {/* 截图列表页面 */}
         <Route path="/screenshots" element={<ScreenshotList />} />
-        
-        {/* 截图标注详情页面 */}
-        <Route path="/screenshots/:id" element={<AnnotationDetail />} />
-        
+
+        {/* 截图标注详情页面 - 使用 PixiJS v8 */}
+        <Route path="/screenshots/:id" element={<PixiJSAnnotationDetail />} />
+
         {/* 截图历史记录页面 */}
         <Route path="/screenshots/:id/history" element={<ScreenshotHistory />} />
-        
+
         {/* 标注列表页面 */}
         <Route path="/annotations" element={<AnnotationList />} />
-        
-        {/* 通过标注ID跳转到标注详情 */}
+
+        {/* 通过标注ID跳转到标注详情页面 */}
         <Route path="/annotations/:id" element={<NavigateToDetail />} />
-        
+
         {/* Python 代码预览页面 */}
         <Route path="/python" element={<PythonPreview />} />
       </Routes>
