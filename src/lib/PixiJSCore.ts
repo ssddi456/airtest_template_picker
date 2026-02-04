@@ -64,79 +64,93 @@ export class PixiJSCore {
     this.imagePath = imagePath;
 
     const img = new Image();
+    img.crossOrigin = 'anonymous'; // 添加跨域支持
     img.onload = async () => {
-      const bbox = containerElement.getBoundingClientRect();
-      const width = bbox.width;
-      const height = bbox.height;
+      try {
+        const bbox = containerElement.getBoundingClientRect();
+        const width = bbox.width;
+        const height = bbox.height;
 
-      // 通知 React 图像已加载
-      this.callbacks.onImageLoaded?.(img.width, img.height);
+        // 通知 React 图像已加载
+        this.callbacks.onImageLoaded?.(img.width, img.height);
 
-      // 创建 PixiJS 应用
-      const app = new PIXI.Application();
-      await app.init({
-        width,
-        height,
-        backgroundColor: 0xf0f0f0,
-        antialias: true,
-      });
-
-      if (containerElement) {
-        containerElement.appendChild(app.canvas);
-        this.app = app;
-      }
-
-      // 创建 viewport（支持缩放和平移）
-      const viewport = new Viewport({
-        screenWidth: width,
-        screenHeight: height,
-        worldWidth: img.width,
-        worldHeight: img.height,
-        events: app.renderer.events,
-        passiveWheel: false,
-      });
-      this.viewport = viewport;
-
-      // 配置 viewport 插件
-      viewport
-        .drag({
-          pressDrag: true,
-          factor: 1,
-          mouseButtons: 'left',
-        })
-        .wheel({
-          percent: 0.1,
-          center: null,
-          wheelZoom: true,
-        })
-        .clampZoom({
-          minScale: 0.5,
-          maxScale: 3,
-        })
-        .decelerate({
-          friction: 0.95,
+        // 创建 PixiJS 应用
+        const app = new PIXI.Application();
+        await app.init({
+          width,
+          height,
+          backgroundColor: 0xf0f0f0,
+          antialias: true,
         });
 
-      app.stage.addChild(viewport);
+        if (containerElement) {
+          containerElement.appendChild(app.canvas);
+          this.app = app;
+        }
 
-      // 加载图像
-      const texture = PIXI.Texture.from(imagePath);
-      const sprite = new PIXI.Sprite(texture);
-      sprite.anchor.set(0, 0);
-      viewport.addChild(sprite);
-      this.imageSprite = sprite;
+        // 创建 viewport（支持缩放和平移）
+        const viewport = new Viewport({
+          screenWidth: width,
+          screenHeight: height,
+          worldWidth: img.width,
+          worldHeight: img.height,
+          events: app.renderer.events,
+          passiveWheel: false,
+        });
+        this.viewport = viewport;
 
-      // 创建绘制矩形图层
-      const graphics = new PIXI.Graphics();
-      graphics.eventMode = 'static';
-      app.stage.addChild(graphics);
-      this.drawingRect = graphics;
+        // 配置 viewport 插件
+        viewport
+          .drag({
+            pressDrag: true,
+            factor: 1,
+            mouseButtons: 'left',
+          })
+          .wheel({
+            percent: 0.1,
+            center: null,
+            wheelZoom: true,
+          })
+          .clampZoom({
+            minScale: 0.5,
+            maxScale: 3,
+          })
+          .decelerate({
+            friction: 0.95,
+          });
 
-      // 设置画布点击事件
-      this.setupCanvasEvents();
+        app.stage.addChild(viewport);
 
-      console.log('Image loaded with size:', img.width, img.height);
+        // 使用已加载的图片创建纹理
+        const texture = PIXI.Texture.from(img);
+        const sprite = new PIXI.Sprite(texture);
+        sprite.anchor.set(0, 0);
+        viewport.addChild(sprite);
+        this.imageSprite = sprite;
+
+        // 创建绘制矩形图层
+        const graphics = new PIXI.Graphics();
+        graphics.eventMode = 'static';
+        app.stage.addChild(graphics);
+        this.drawingRect = graphics;
+
+        // 设置画布点击事件
+        this.setupCanvasEvents();
+
+        console.log('Image loaded with size:', img.width, img.height);
+        console.log('Viewport initialized with world size:', viewport.worldWidth, viewport.worldHeight);
+        console.log('Sprite added to viewport:', sprite.width, sprite.height);
+      } catch (error) {
+        console.error('Error initializing PixiJS:', error);
+        this.callbacks.onImageLoaded?.(0, 0);
+      }
     };
+
+    img.onerror = () => {
+      console.error('Failed to load image:', imagePath);
+      this.callbacks.onImageLoaded?.(0, 0);
+    };
+
     img.src = imagePath;
   }
 

@@ -61,7 +61,7 @@ Metis consultation encountered system error. Proceeding with self-identified gap
   - `App.tsx`: 主应用组件
   - `components/`: React组件
     - `ScreenshotManager.tsx`: 截图管理组件
-    - `AnnotationEditor.tsx`: UI元素标注编辑器
+    - `PixiJSAnnotationEditor.tsx`: UI元素标注编辑器
     - `VersionHistory.tsx`: 版本历史查看器
     - `PythonPreview.tsx`: Python代码预览
   - `lib/`: 工具库
@@ -816,7 +816,7 @@ Parallel Speedup: ~50% faster than sequential
 - [ ] 10. 标注编辑器组件
 
   **What to do**:
-  - [ ] 创建 `src/components/AnnotationEditor.tsx` 标注编辑器组件
+  - [ ] 创建 `src/components/PixiJSAnnotationEditor.tsx` 标注编辑器组件
   - [ ] 使用Canvas或SVG实现矩形框绘制
   - [ ] 实现鼠标拖拽创建矩形框
   - [ ] 实现矩形框的拖拽移动和调整大小
@@ -890,7 +890,7 @@ Parallel Speedup: ~50% faster than sequential
 
   **Commit**: YES | NO (groups with N)
   - Message: `feat(ui): implement rectangle annotation editor`
-  - Files: `src/components/AnnotationEditor.tsx`
+  - Files: `src/components/PixiJSAnnotationEditor.tsx`
   - Pre-commit: none
 
 - [ ] 11. 版本历史和预览组件
@@ -1129,7 +1129,7 @@ Parallel Speedup: ~50% faster than sequential
 | 7 | `feat(python): implement Airtest Template code generator` | server/lib/pythonGenerator.ts | curl POST /api/python/generate |
 | 8 | `feat(ui): create layout and navigation components` | src/index.tsx, src/App.tsx, src/components/Layout.tsx, src/components/Navigation.tsx | playwright screenshot |
 | 9 | `feat(ui): implement screenshot upload and management` | src/components/ScreenshotManager.tsx, src/lib/api.ts | playwright upload test |
-| 10 | `feat(ui): implement rectangle annotation editor` | src/components/AnnotationEditor.tsx | playwright annotation test |
+| 10 | `feat(ui): implement rectangle annotation editor` | src/components/PixiJSAnnotationEditor.tsx | playwright annotation test |
 | 11 | `feat(ui): implement version history and Python preview` | src/components/VersionHistory.tsx, src/components/PythonPreview.tsx | playwright version test |
 | 12 | `feat(integration): integrate all components and verify workflow` | src/App.tsx, various | playwright E2E |
 | 13 | `docs: add README and architecture documentation` | README.md, ARCHITECTURE.md | cat files |

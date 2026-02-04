@@ -45,7 +45,7 @@
   - 更新了 `src/App.tsx` 集成组件
 
 - [x] 10. 标注编辑器组件
-  - 创建了 `src/components/AnnotationEditor.tsx` - Canvas标注编辑器
+  - 创建了 `src/components/PixiJSAnnotationEditor.tsx` - Canvas标注编辑器
   - 支持鼠标拖拽绘制矩形
   - 显示绝对坐标和相对坐标
   - 支持选中、移动、删除矩形
@@ -74,7 +74,7 @@
 **新创建的文件：**
 - src/lib/api.ts
 - src/components/ScreenshotManager.tsx
-- src/components/AnnotationEditor.tsx
+- src/components/PixiJSAnnotationEditor.tsx
 - src/components/VersionHistory.tsx
 - src/components/PythonPreview.tsx
 - README.md

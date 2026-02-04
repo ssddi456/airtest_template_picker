@@ -182,7 +182,7 @@ interface AnnotationData {
 - Search and filter by group
 - Select screenshot for annotation
 
-### AnnotationEditor (`src/components/AnnotationEditor.tsx`)
+### PixiJSAnnotationEditor (`src/components/PixiJSAnnotationEditor.tsx`)
 - Canvas-based rectangle drawing
 - Create, select, move, resize rectangles
 - Display absolute and relative coordinates
@@ -244,7 +244,7 @@ interface AnnotationData {
 
 ### Create Annotation
 ```
-1. User draws rectangle on canvas in AnnotationEditor
+1. User draws rectangle on canvas in PixiJSAnnotationEditor
 2. Coordinates captured (absolute + relative)
 3. User enters annotation name
 4. Click "Save Annotations"
@@ -345,7 +345,7 @@ npm run build
 ## Extension Points
 
 ### Adding New Annotation Shapes
-- Modify `src/components/AnnotationEditor.tsx` canvas drawing logic
+- Modify `src/components/PixiJSAnnotationEditor.tsx` canvas drawing logic
 - Update `src/types/index.ts` Annotation interface
 - Adjust `server/lib/fileStorage.ts` coordinate calculation
 

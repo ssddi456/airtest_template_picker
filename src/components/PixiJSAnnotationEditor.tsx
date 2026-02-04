@@ -202,9 +202,13 @@ export default function PixiJSAnnotationEditor({
       <div className="bg-white rounded-lg shadow p-6">
         <div className="mb-4 flex justify-between items-center">
           <div className="text-sm text-gray-600">
-            {imageSize.width > 0 && (
+            {imageSize.width > 0 ? (
               <span>
                 Image: {imageSize.width} x {imageSize.height} pixels | Scale: Auto (Use mouse wheel)
+              </span>
+            ) : (
+              <span className="text-yellow-600">
+                Loading image... (Path: {screenshotPath})
               </span>
             )}
           </div>

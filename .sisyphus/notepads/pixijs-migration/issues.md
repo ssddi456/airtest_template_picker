@@ -29,7 +29,7 @@
 
 用户要求：
 1. 使用 PixiJS v8 实现标注器
-2. 替换现有 AnnotationEditor.tsx 组件
+2. 替换现有 PixiJSAnnotationEditor.tsx 组件
 3. 标注数据存储使用 gl2D 格式
 
 ### 已完成的工作
