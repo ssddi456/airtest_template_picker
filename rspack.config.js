@@ -88,7 +88,11 @@ module.exports = {
     devServer: {
         hot: true,
         historyApiFallback: {
-            index: '/'
+            index: '/',
+            verbose: true,
+            rewrites: [
+                { from: /^\/.*$/, to: '/' },
+            ],
         },
         port: process.env.DEV_PORT,
         proxy: [
