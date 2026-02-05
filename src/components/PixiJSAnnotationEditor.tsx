@@ -27,17 +27,32 @@ export default function PixiJSAnnotationEditor({
   useEffect(() => {
     if (!canvasRef.current) return;
 
+    const handleSpacebar = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener('keydown', handleSpacebar);
+    window.addEventListener('keyup', handleSpacebar);
     const initApp = () => {
       const callbacks: PixiJSCoreCallbacks = {
         onAnnotationSelected: (id: string, label: string) => {
           setSelectedAnnotationId(id);
           setEditingLabel(label);
         },
-        onAnnotationCreated: (annotation: AnnotationData) => {
+        onAnnotationCreated: async (annotation: AnnotationData) => {
+          setLoading(true);
           console.log('Annotation created:', annotation);
+          await saveAnnotations(screenshotId, [...(pixiCoreRef.current?.getAllAnnotations() || []), annotation]);
+          setLoading(false);
         },
-        onAnnotationUpdated: (id: string, rect: AnnotationData['rect']) => {
+        onAnnotationUpdated: async (id: string, rect: AnnotationData['rect']) => {
+          setLoading(true);
+
           console.log('Annotation updated:', id, rect);
+          await saveAnnotations(screenshotId, pixiCoreRef.current?.getAllAnnotations() || []);
+          setLoading(false);
         },
         onImageLoaded: (width: number, height: number) => {
           setImageSize({ width, height });
@@ -59,6 +74,9 @@ export default function PixiJSAnnotationEditor({
         pixiCoreRef.current.destroy();
         pixiCoreRef.current = null;
       }
+
+      window.removeEventListener('keydown', handleSpacebar);
+      window.removeEventListener('keyup', handleSpacebar);
     };
   }, [canvasRef.current, screenshotPath]);
 
