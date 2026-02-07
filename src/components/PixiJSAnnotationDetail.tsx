@@ -54,7 +54,7 @@ export default function PixiJSAnnotationDetail() {
     );
   }
 
-  if (!screenshotData) {
+  if (!screenshotData || !screenshotId) {
     return null;
   }
 

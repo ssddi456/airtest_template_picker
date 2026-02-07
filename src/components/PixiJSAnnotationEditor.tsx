@@ -16,6 +16,7 @@ export default function PixiJSAnnotationEditor({
   const canvasRef = useRef<HTMLDivElement>(null);
   const pixiCoreRef = useRef<PixiJSCore | null>(null);
 
+  const [annotations, setAnnotations] = useState<AnnotationData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -25,16 +26,23 @@ export default function PixiJSAnnotationEditor({
 
   // 初始化 PixiJS 应用
   useEffect(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current || !screenshotPath) return;
+    // 加载标注数据
+    const loadAnnotations = async () => {
+      setLoading(true);
+      setError(null);
 
-    const handleSpacebar = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        e.preventDefault();
+      const result = await getAnnotations(screenshotId);
+      setLoading(false);
+
+      if (result.success && result.data) {
+        pixiCoreRef.current?.setAnnotations(result.data);
+        setAnnotations(result.data);
+      } else if (result.error) {
+        setError(result.error);
       }
     };
 
-    window.addEventListener('keydown', handleSpacebar);
-    window.addEventListener('keyup', handleSpacebar);
     const initApp = () => {
       const callbacks: PixiJSCoreCallbacks = {
         onAnnotationSelected: (id: string, label: string) => {
@@ -45,6 +53,7 @@ export default function PixiJSAnnotationEditor({
           setLoading(true);
           console.log('Annotation created:', annotation);
           await saveAnnotations(screenshotId, [...(pixiCoreRef.current?.getAllAnnotations() || []), annotation]);
+          await loadAnnotations();
           setLoading(false);
         },
         onAnnotationUpdated: async (id: string, rect: AnnotationData['rect']) => {
@@ -52,6 +61,7 @@ export default function PixiJSAnnotationEditor({
 
           console.log('Annotation updated:', id, rect);
           await saveAnnotations(screenshotId, pixiCoreRef.current?.getAllAnnotations() || []);
+          await loadAnnotations();
           setLoading(false);
         },
         onImageLoaded: (width: number, height: number) => {
@@ -59,53 +69,31 @@ export default function PixiJSAnnotationEditor({
         },
       };
 
-      const pixiCore = new PixiJSCore(callbacks);
-      pixiCoreRef.current = pixiCore;
-
-      if (canvasRef.current) {
-        pixiCore.initialize(canvasRef.current, screenshotPath);
+      if (!pixiCoreRef.current) {
+        const pixiCore = new PixiJSCore(callbacks);
+        pixiCoreRef.current = pixiCore;
+        pixiCoreRef.current.initialize(canvasRef.current!, screenshotPath);
+        pixiCoreRef.current.setAnnotations(annotations);
+      } else {
+        pixiCoreRef.current.updateCallbacks(callbacks);
       }
+
     };
 
     initApp();
+    loadAnnotations();
 
     return () => {
-      if (pixiCoreRef.current) {
-        pixiCoreRef.current.destroy();
-        pixiCoreRef.current = null;
-      }
-
-      window.removeEventListener('keydown', handleSpacebar);
-      window.removeEventListener('keyup', handleSpacebar);
     };
   }, [canvasRef.current, screenshotPath]);
 
-  // 加载标注数据
-  useEffect(() => {
-    const loadAnnotations = async () => {
-      setLoading(true);
-      setError(null);
 
-      const result = await getAnnotations(screenshotId);
-      setLoading(false);
-
-      if (result.success && result.data) {
-        pixiCoreRef.current?.renderAnnotations(result.data);
-      } else if (result.error) {
-        setError(result.error);
-      }
-    };
-
-    if (pixiCoreRef.current) {
-      loadAnnotations();
-    }
-  }, [screenshotId]);
 
   // 全局鼠标事件
   useEffect(() => {
     const handleGlobalMouseMove = (e: MouseEvent) => {
       if (!pixiCoreRef.current) return;
-
+      
       const rect = canvasRef.current?.getBoundingClientRect();
       if (!rect) return;
 
@@ -118,6 +106,7 @@ export default function PixiJSAnnotationEditor({
     };
 
     const handleGlobalMouseUp = (e: MouseEvent) => {
+      console.log('Global mouse up:', e.clientX, e.clientY);
       if (!pixiCoreRef.current) return;
 
       const rect = canvasRef.current?.getBoundingClientRect();
@@ -158,6 +147,7 @@ export default function PixiJSAnnotationEditor({
     pixiCoreRef.current?.deleteAnnotation(selectedAnnotationId);
     setSelectedAnnotationId(null);
     setEditingLabel('');
+    handleSave();
   };
 
   // 保存标注
@@ -334,14 +324,14 @@ export default function PixiJSAnnotationEditor({
       )}
 
       {/* Annotations List */}
-      {pixiCoreRef.current && pixiCoreRef.current.getAllAnnotations().length > 0 && (
+      {annotations.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold mb-4">
-            All Annotations ({pixiCoreRef.current.getAllAnnotations().length})
+            All Annotations ({annotations.length})
           </h3>
 
           <div className="space-y-2">
-            {pixiCoreRef.current.getAllAnnotations().map((ann) => (
+            {annotations.map((ann) => (
               <div
                 key={ann.id}
                 onClick={() => selectAnnotation(ann.id, ann.name)}

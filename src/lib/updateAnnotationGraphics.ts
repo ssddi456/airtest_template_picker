@@ -65,7 +65,7 @@ export function updateAnnotationGraphics(
           break;
         case 'sw':
           cx = -halfHandle;
-          cy = height / 2 - halfHandle;
+          cy = height - halfHandle;
           break;
         case 'w':
           cx = -halfHandle;

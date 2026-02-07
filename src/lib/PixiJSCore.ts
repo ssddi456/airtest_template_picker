@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { Viewport } from 'pixi-viewport';
 import { updateAnnotationGraphics } from './updateAnnotationGraphics';
-
+import { v4 as uuidv4 } from 'uuid';
 
 export interface AnnotationData {
   id: string;
@@ -38,22 +38,39 @@ enum MouseMode {
   select,
 }
 
+let instanceCounter = 0;
 export class PixiJSCore {
   private app: PIXI.Application | null = null;
   private imageSprite: PIXI.Sprite | null = null;
-  private viewport: any | null = null;
+  private viewport: Viewport | null = null;
   private drawingRect: PIXI.Graphics | null = null;
   private annotations: AnnotationData[] = [];
   private annotationStates: Map<string, InternalAnnotationState> = new Map();
-  private tempAnnotation: AnnotationData | null = null;
-  private containerElement: HTMLElement | null = null;
-  private imagePath: string = '';
   private callbacks: PixiJSCoreCallbacks = {};
 
   // 交互状态
-  private isDrawing = false;
-  private drawStart: { x: number; y: number } | null = null;
+  private _isDrawing = false;
+  private _drawStart: { x: number; y: number } | null = null;
   private isDragging = false;
+
+  get isDrawing(): boolean {
+    return this._isDrawing;
+  }
+
+  set isDrawing(value: boolean) {
+    this._isDrawing = value;
+    this.log('isDrawing changed to:', value);
+  }
+
+  get drawStart(): { x: number; y: number } | null {
+    return this._drawStart;
+  }
+
+  set drawStart(value: { x: number; y: number } | null) {
+    this._drawStart = value;
+    this.log('drawStart changed to:', value);
+  }
+
   private isResizing = false;
   private dragStart: { x: number; y: number } | null = null;
   private originalPosition: { x: number; y: number; width: number; height: number } | null = null;
@@ -62,17 +79,26 @@ export class PixiJSCore {
 
   private mouseMode = MouseMode.select;
 
+  private instanceId: string = `PixiJSCore_${++instanceCounter}`;
+
+  log = (...args: any[]) => {
+    console.log(`[${this.instanceId}]`, ...args);
+  };
+
   constructor(callbacks: PixiJSCoreCallbacks = {}) {
     this.callbacks = callbacks;
+    this.log('instance created with callbacks:', this, callbacks);
+  }
+
+  updateCallbacks(callbacks: PixiJSCoreCallbacks): void {
+    this.callbacks = callbacks;
+    this.log('Callbacks updated:', this, callbacks);
   }
 
   /**
    * 初始化 PixiJS 应用
    */
   async initialize(containerElement: HTMLElement, imagePath: string): Promise<void> {
-    this.containerElement = containerElement;
-    this.imagePath = imagePath;
-
     const img = new Image();
     img.crossOrigin = 'anonymous'; // 添加跨域支持
     img.onload = async () => {
@@ -140,18 +166,23 @@ export class PixiJSCore {
         viewport.addChild(sprite);
         this.imageSprite = sprite;
 
+
         // 创建绘制矩形图层
         const graphics = new PIXI.Graphics();
         graphics.eventMode = 'static';
         app.stage.addChild(graphics);
         this.drawingRect = graphics;
 
+        // app basic layers created
+        
         // 设置画布点击事件
         this.setupCanvasEvents();
 
-        console.log('Image loaded with size:', img.width, img.height);
-        console.log('Viewport initialized with world size:', viewport.worldWidth, viewport.worldHeight);
-        console.log('Sprite added to viewport:', sprite.width, sprite.height);
+        this.renderAnnotations(this.annotations);
+
+        this.log('Image loaded with size:', img.width, img.height);
+        this.log('Viewport initialized with world size:', viewport.worldWidth, viewport.worldHeight);
+        this.log('Sprite added to viewport:', sprite.width, sprite.height);
       } catch (error) {
         console.error('Error initializing PixiJS:', error);
         this.callbacks.onImageLoaded?.(0, 0);
@@ -175,33 +206,39 @@ export class PixiJSCore {
     this.app.stage.eventMode = 'static';
     this.app.stage.hitArea = this.app.screen;
     this.app.stage.on('pointerdown', event => this.handleCanvasClick(event));
-
-
     this.app.stage.on('pointermove', (event: PIXI.FederatedPointerEvent) => {
-      event.stopPropagation();
       this.handleAnnotationPointerMove(event, this.selectedAnnotationId);
     });
 
-    this.app.stage.on('pointerup', (event: PIXI.FederatedPointerEvent) => {
-      event.stopPropagation();
-      this.handleAnnotationPointerUp();
-    });
+    window.addEventListener('keydown', this.handleSpaceKeyDown);
 
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'Space') {
-        this.viewport.plugins.resume('drag');
-      }
-    });
-
-    window.addEventListener('keyup', (e) => {
-      if (e.code === 'Space') {
-        this.viewport.plugins.pause('drag');
-      }
-    });
+    window.addEventListener('keyup', this.handleSpaceKeyUp);
 
   }
 
+  handleSpaceKeyDown = (e: KeyboardEvent): void => {
+    if (e.code === 'Space') {
+      e.preventDefault();
+      if (e.repeat === false) {
+        this.isDragging = false;
+        this.log('Space key pressed - switching to move mode');
+        this.viewport!.plugins.resume('drag');
+        this.mouseMode = MouseMode.move;
+      }
+    }
+  }
+
+  handleSpaceKeyUp = (e: KeyboardEvent): void => {
+    if (e.code === 'Space') {
+      e.preventDefault();
+      this.log('Space key released - switching to select mode');
+      this.viewport!.plugins.pause('drag');
+      this.mouseMode = MouseMode.select;
+    }
+  }
+
   setAnnotations(annotations: AnnotationData[]): void {
+    console.log('Setting annotations:', annotations);
     this.annotations = annotations;
     this.renderAnnotations(annotations);
   }
@@ -212,6 +249,8 @@ export class PixiJSCore {
     if (!this.app || !this.imageSprite || !this.drawingRect) {
       return;
     }
+
+    console.log('Rendering annotations:', annotations);
 
     const sprite = this.imageSprite;
     const graphics = this.drawingRect;
@@ -245,65 +284,7 @@ export class PixiJSCore {
 
       // 创建矩形图形
       const rectGraphics = new PIXI.Graphics();
-      rectGraphics.rect(0, 0, rect.width, rect.height);
-      rectGraphics.fill({ color: 0xff0000, alpha: 0.1 });
-      rectGraphics.stroke({ color: 0xff0000, width: 2 });
-
-      // 添加角点控制（用于调整大小）
-      const cornerSize = 8;
-      const halfHandle = cornerSize / 2;
-
-      // 绘制8个调整手柄
-      const handles: HandleType[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
-      handles.forEach((handle) => {
-        let cx, cy;
-        switch (handle) {
-          case 'nw':
-            cx = -halfHandle;
-            cy = -halfHandle;
-            break;
-          case 'n':
-            cx = rect.width / 2 - halfHandle;
-            cy = -halfHandle;
-            break;
-          case 'ne':
-            cx = rect.width - halfHandle;
-            cy = -halfHandle;
-            break;
-          case 'e':
-            cx = rect.width - halfHandle;
-            cy = rect.height / 2 - halfHandle;
-            break;
-          case 'se':
-            cx = rect.width - halfHandle;
-            cy = rect.height - halfHandle;
-            break;
-          case 's':
-            cx = rect.width / 2 - halfHandle;
-            cy = rect.height - halfHandle;
-            break;
-          case 'sw':
-            cx = -halfHandle;
-            cy = rect.height / 2 - halfHandle;
-            break;
-          case 'w':
-            cx = -halfHandle;
-            cy = rect.height / 2 - halfHandle;
-            break;
-        }
-        rectGraphics.rect(cx ?? 0, cy ?? 0, cornerSize, cornerSize);
-        rectGraphics.fill({ color: 0xff0000, alpha: 1 });
-      });
-
-      // 添加点击事件
-      container.eventMode = 'static';
-      container.cursor = 'pointer';
-      container.on('pointerdown', (event: PIXI.FederatedPointerEvent) => {
-        event.stopPropagation();
-        this.selectAnnotation(id, label);
-        this.handleAnnotationPointerDown(event, id);
-      });
-
+      updateAnnotationGraphics(rectGraphics, this.selectedAnnotationId === id, rect.width, rect.height);
       container.addChild(rectGraphics);
 
       // 添加标签文本
@@ -317,7 +298,7 @@ export class PixiJSCore {
       text.y = -16;
       container.addChild(text);
 
-      this.app?.stage.addChild(container);
+      this.viewport!.addChild(container);
 
       // 保存标注状态
       this.annotationStates.set(id, {
@@ -338,6 +319,10 @@ export class PixiJSCore {
    * 选择标注
    */
   selectAnnotation(id: string, label: string): void {
+    if (this.selectedAnnotationId === id) {
+      return;
+    }
+    this.selectedAnnotationId = id;
     this.callbacks.onAnnotationSelected?.(id, label);
 
     // 更新视觉效果
@@ -345,13 +330,7 @@ export class PixiJSCore {
       if (ann.pixiContainer) {
         const rectGraphics = ann.pixiContainer.getChildAt(0) as PIXI.Graphics;
         if (rectGraphics) {
-          if (ann.id === id) {
-            // 选中：蓝色 + 调整手柄
-            updateAnnotationGraphics(rectGraphics, true, ann.width, ann.height);
-          } else {
-            // 未选中：红色
-            updateAnnotationGraphics(rectGraphics, false, ann.width, ann.height);
-          }
+          updateAnnotationGraphics(rectGraphics, this.selectedAnnotationId === ann.id, ann.width, ann.height);
         }
       }
     });
@@ -360,8 +339,20 @@ export class PixiJSCore {
   /**
    * 处理画布点击
    */
-  private handleCanvasClick(event: PIXI.FederatedPointerEvent): void {
+  private async handleCanvasClick(event: PIXI.FederatedPointerEvent): Promise<void> {
     if (!this.imageSprite) return;
+
+    this.log('Canvas clicked at:', this, event.global.x, event.global.y);
+    if (this.mouseMode === MouseMode.move) {
+      return;
+    }
+
+    // 检查是否点到其他标注上
+    await new Promise(resolve => setTimeout(resolve, 100)); // 等待事件冒泡完成
+    if (this.selectedAnnotationId) {
+      this.log('Clicked on annotation, not starting new one');
+      return;
+    }
 
     const sprite = this.imageSprite;
     const globalX = event.global.x;
@@ -380,14 +371,6 @@ export class PixiJSCore {
       this.drawingRect.clear();
     }
 
-    setTimeout(() => {
-      if (this.selectedAnnotationId) {
-        return;
-      }
-      
-      // 更好的搞法研究研究
-
-    }, 100);
   }
 
   /**
@@ -395,9 +378,12 @@ export class PixiJSCore {
    */
   handleMouseMove(event: PIXI.FederatedPointerEvent): void {
     if (!this.isDrawing || !this.drawStart || !this.drawingRect) return;
-
+    
     const sprite = this.imageSprite;
     if (!sprite) return;
+
+    this.log('Global mouse move:', event.global.x, event.global.y);
+    this.log('Is drawing:', this, this.isDrawing, 'Draw start:', this.drawStart);
 
     const globalX = event.global.x;
     const globalY = event.global.y;
@@ -407,7 +393,7 @@ export class PixiJSCore {
 
     const graphics = this.drawingRect;
     graphics.clear();
-
+    graphics.fillStyle = 0x3b82f6;
     // 绘制正在绘制的矩形
     const x = Math.min(this.drawStart.x, localX);
     const y = Math.min(this.drawStart.y, localY);
@@ -420,6 +406,7 @@ export class PixiJSCore {
       width * sprite.scale.x,
       height * sprite.scale.y
     );
+    console.log('Drawing rectangle at:', x, y, width, height);
     graphics.stroke({ color: 0x3b82f6, width: 2 });
   }
 
@@ -455,20 +442,8 @@ export class PixiJSCore {
     // 创建新标注
     const x = Math.min(this.drawStart.x, localX);
     const y = Math.min(this.drawStart.y, localY);
-    const id = Date.now().toString();
+    const id = uuidv4();
     const label = `Annotation ${this.annotationStates.size + 1}`;
-
-    // 添加到标注状态
-    const newAnnotation: InternalAnnotationState = {
-      id,
-      label,
-      x,
-      y,
-      width,
-      height,
-      pixiContainer: null,
-    };
-    this.annotationStates.set(id, newAnnotation);
 
     // 选中新标注
     this.selectAnnotation(id, label);
@@ -487,84 +462,6 @@ export class PixiJSCore {
   }
 
   /**
-   * 处理标注容器点击（选择或开始拖拽）
-   */
-  private handleAnnotationPointerDown(event: PIXI.FederatedPointerEvent, annotationId: string): void {
-    const ann = this.annotationStates.get(annotationId);
-    if (!ann) return;
-
-    const sprite = this.imageSprite;
-    if (!sprite) return;
-
-    if (this.selectedAnnotationId) {
-      return;
-    }
-
-    const globalX = event.global.x;
-    const globalY = event.global.y;
-
-    // 检测是否点击了调整手柄
-    const localX = (globalX - (sprite.x ?? 0)) / sprite.scale.x;
-    const localY = (globalY - (sprite.y ?? 0)) / sprite.scale.y;
-
-    const handle = this.detectResizeHandle(localX, localY, ann.width, ann.height);
-    if (handle) {
-      // 开始调整大小
-      this.isResizing = true;
-      this.selectedAnnotationId = annotationId;
-      this.resizeHandle = handle;
-      this.originalPosition = { x: ann.x, y: ann.y, width: ann.width, height: ann.height };
-      return;
-    }
-
-    // 否则选择或开始拖拽
-    this.isDragging = true;
-    this.dragStart = { x: globalX, y: globalY };
-  }
-
-  /**
-   * 检测调整手柄
-   */
-  private detectResizeHandle(
-    localX: number,
-    localY: number,
-    width: number,
-    height: number
-  ): HandleType | null {
-    const cornerSize = 8;
-    const halfHandle = cornerSize / 2;
-    const tolerance = 10;
-
-    // 检查8个手柄
-    if (Math.abs(localX + halfHandle) <= tolerance && Math.abs(localY + halfHandle) <= tolerance) {
-      return 'nw';
-    }
-    if (Math.abs(localX - width / 2) <= tolerance && Math.abs(localY + halfHandle) <= tolerance) {
-      return 'n';
-    }
-    if (Math.abs(localX - width + halfHandle) <= tolerance && Math.abs(localY + halfHandle) <= tolerance) {
-      return 'ne';
-    }
-    if (Math.abs(localX - width + halfHandle) <= tolerance && Math.abs(localY - height / 2) <= tolerance) {
-      return 'e';
-    }
-    if (Math.abs(localX - width + halfHandle) <= tolerance && Math.abs(localY - height + halfHandle) <= tolerance) {
-      return 'se';
-    }
-    if (Math.abs(localX + halfHandle) <= tolerance && Math.abs(localY - height / 2) <= tolerance) {
-      return 's';
-    }
-    if (Math.abs(localX - width / 2) <= tolerance && Math.abs(localY - height + halfHandle) <= tolerance) {
-      return 'sw';
-    }
-    if (Math.abs(localX + halfHandle) <= tolerance && Math.abs(localY - height + halfHandle) <= tolerance) {
-      return 'w';
-    }
-
-    return null;
-  }
-
-  /**
    * 处理标注容器指针移动
    */
   handleAnnotationPointerMove(event: PIXI.FederatedPointerEvent, annotationId: string | null): void {
@@ -575,6 +472,8 @@ export class PixiJSCore {
 
     const sprite = this.imageSprite;
     if (!sprite) return;
+
+    event.stopPropagation();
 
     const globalX = event.global.x;
     const globalY = event.global.y;
@@ -620,23 +519,14 @@ export class PixiJSCore {
           newX = this.originalPosition.x + dx;
           newHeight = Math.max(20, this.originalPosition.height - dy);
           break;
+        default:
+          this.updateAnnotationPosition(annotationId, ann.x + dx, ann.y + dy, ann.width, ann.height);
+          return;
       }
 
       // 更新标注
-      this.updateAnnotationPosition(annotationId, newX, newY, newWidth, newHeight);
-    } else if (this.isDragging && this.dragStart) {
-      // 拖拽移动
-      const dx = (globalX - this.dragStart.x) / sprite.scale.x;
-      const dy = (globalY - this.dragStart.y) / sprite.scale.y;
-
-      this.updateAnnotationPosition(
-        annotationId,
-        ann.x + dx,
-        ann.y + dy,
-        ann.width,
-        ann.height
-      );
-    }
+    } 
+    this.callbacks.onAnnotationUpdated?.(annotationId, { x: ann.x, y: ann.y, width: ann.width, height: ann.height });
   }
 
   /**
@@ -675,54 +565,7 @@ export class PixiJSCore {
     const rectGraphics = ann.pixiContainer.getChildAt(0) as PIXI.Graphics;
     if (rectGraphics) {
       rectGraphics.clear();
-      rectGraphics.rect(0, 0, newWidth, newHeight);
-      rectGraphics.fill({ color: 0x3b82f6, alpha: 0.1 });
-      rectGraphics.stroke({ color: 0x3b82f6, width: 2 });
-
-      // 更新调整手柄位置
-      const cornerSize = 8;
-      const halfHandle = cornerSize / 2;
-
-      const handles: HandleType[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
-      handles.forEach((handle) => {
-        let cx, cy;
-        switch (handle) {
-          case 'nw':
-            cx = -halfHandle;
-            cy = -halfHandle;
-            break;
-          case 'n':
-            cx = newWidth / 2 - halfHandle;
-            cy = -halfHandle;
-            break;
-          case 'ne':
-            cx = newWidth - halfHandle;
-            cy = -halfHandle;
-            break;
-          case 'e':
-            cx = newWidth - halfHandle;
-            cy = newHeight / 2 - halfHandle;
-            break;
-          case 'se':
-            cx = newWidth - halfHandle;
-            cy = newHeight - halfHandle;
-            break;
-          case 's':
-            cx = newWidth / 2 - halfHandle;
-            cy = newHeight - halfHandle;
-            break;
-          case 'sw':
-            cx = -halfHandle;
-            cy = newHeight / 2 - halfHandle;
-            break;
-          case 'w':
-            cx = -halfHandle;
-            cy = newHeight / 2 - halfHandle;
-            break;
-        }
-        rectGraphics.rect(cx ?? 0, cy ?? 0, cornerSize, cornerSize);
-        rectGraphics.fill({ color: 0x3b82f6, alpha: 1 });
-      });
+      updateAnnotationGraphics(rectGraphics, true, newWidth, newHeight);
     }
 
     // 通知 React 标注已更新
@@ -810,6 +653,7 @@ export class PixiJSCore {
    * 销毁 PixiJS 应用
    */
   destroy(): void {
+    this.log('PixiJSCore Destroying PixiJS application and cleaning up resources');
     if (this.app) {
       this.app.destroy(true);
       this.app = null;
@@ -818,5 +662,8 @@ export class PixiJSCore {
     this.viewport = null;
     this.drawingRect = null;
     this.annotationStates.clear();
+
+    window.removeEventListener('keydown', this.handleSpaceKeyDown);  
+    window.removeEventListener('keyup', this.handleSpaceKeyUp);
   }
 }
