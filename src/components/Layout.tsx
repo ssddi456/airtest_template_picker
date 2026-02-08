@@ -17,7 +17,7 @@ export default function Layout({ children }: LayoutProps) {
         </div>
       </header>
 
-      <main className="flex-1 max-w-7xl mx-auto">
+      <main className="flex-1 w-180 mx-auto">
         {children}
       </main>
 

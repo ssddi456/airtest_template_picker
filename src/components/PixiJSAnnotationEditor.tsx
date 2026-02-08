@@ -40,7 +40,7 @@ export default function PixiJSAnnotationEditor({
       if (!isSameAnnotationData(annotationData, result.data)) {
         setAnnotationData(result.data);
       }
-        pixiCoreRef.current?.setAnnotations(result.data.currentAnnotations);
+      pixiCoreRef.current?.setAnnotations(result.data.currentAnnotations);
     } else if (result.error) {
       setError(result.error);
     }
@@ -105,7 +105,7 @@ export default function PixiJSAnnotationEditor({
 
         await saveAnnotations(screenshotId, {
           x: 0, y: 0, width: imageSize.width, height: imageSize.height
-        },annotations);
+        }, annotations);
         await loadAnnotations();
         setLoading(false);
       },
@@ -142,7 +142,7 @@ export default function PixiJSAnnotationEditor({
     canvasRef.current,
     initiated,
     screenshotPath,
-    annotationData, 
+    annotationData,
     loadAnnotations,
     convertToAnnotation
   ]);
@@ -152,7 +152,7 @@ export default function PixiJSAnnotationEditor({
   useEffect(() => {
     const handleGlobalMouseMove = (e: MouseEvent) => {
       if (!pixiCoreRef.current) return;
-      
+
       const rect = canvasRef.current?.getBoundingClientRect();
       if (!rect) return;
 
@@ -253,7 +253,7 @@ export default function PixiJSAnnotationEditor({
       const result = await saveAnnotations(
         screenshotId,
         { x: 0, y: 0, width: imageSize.width, height: imageSize.height },
-         annotations);
+        annotations);
 
       setSaving(false);
 
@@ -271,8 +271,42 @@ export default function PixiJSAnnotationEditor({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-lg shadow m-6">
-        <p className="text-gray-600">{screenshotName} - Draw rectangles to annotate UI elements</p>
+      <div className="bg-white  my-6">
+        <p className="text-gray-600">
+          {imageSize.width > 0 ? (
+            <div className="flex justify-between  items-center">
+              <div>
+                {screenshotName} {imageSize.width} x {imageSize.height} px
+              </div>
+              <div className="flex items-center">
+                <div className="space-x-2">
+                  <button
+                    onClick={() => {
+                      // Reset view to default (handled by pixi-viewport)
+                      if (pixiCoreRef.current) {
+                        pixiCoreRef.current.resetView();
+                      }
+                    }}
+                    className="px-2 py-1 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                  >
+                    Reset View
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="px-2 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {saving ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <span className="text-yellow-600">
+              Loading image... (Path: {screenshotPath})
+            </span>
+          )}
+        </p>
         <div className="text-sm text-gray-500 mt-2">
           Controls: Scroll to zoom • Drag selected boxes to move • Drag corners to resize
         </div>
@@ -286,57 +320,21 @@ export default function PixiJSAnnotationEditor({
       )}
 
       {/* PixiJS Canvas Container & Annotation Tabs */}
-      <div className="flex gap-6 m-6">
+      <div className="flex gap-6 my-6">
         {/* Left: Canvas */}
         <div className="flex-1 bg-white rounded-lg shadow flex flex-col">
-          <div className="mb-4 flex justify-between items-center sticky top-0 bg-white pt-4 pb-2 z-10 px-6">
-            <div className="text-sm text-gray-600">
-              {imageSize.width > 0 ? (
-                <span>
-                  Image: {imageSize.width} x {imageSize.height} pixels | Scale: Auto (Use mouse wheel)
-                </span>
-              ) : (
-                <span className="text-yellow-600">
-                  Loading image... (Path: {screenshotPath})
-                </span>
-              )}
-            </div>
-            <div className="space-x-2">
-              <button
-                onClick={() => {
-                  // Reset view to default (handled by pixi-viewport)
-                  if (pixiCoreRef.current) {
-                    pixiCoreRef.current.resetView();
-                  }
-                }}
-                className="px-2 py-1 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
-              >
-                Reset View
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="px-2 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-              >
-                {saving ? 'Saving...' : 'Save Annotations'}
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-1 px-6 pb-6">
-            <div
-              ref={canvasRef}
-              className={`
-                border border-gray-300 rounded bg-gray-100 cursor-crosshair
-                h-150
-              `}
-              style={{ width: '100%', overflow: 'hidden' }}
-            />
-          </div>
+          <div
+            ref={canvasRef}
+            className={`
+              border border-gray-300 rounded bg-gray-100 cursor-crosshair
+              h-150
+            `}
+            style={{ width: '100%', overflow: 'hidden' }}
+          />
         </div>
 
         {/* Right: Annotation Tabs */}
-        <div className="w-80 flex-shrink-0">
+        <div className="w-64">
           <AnnotationTabs
             annotations={annotationData?.currentAnnotations || []}
             selectedAnnotationId={selectedAnnotationId}
