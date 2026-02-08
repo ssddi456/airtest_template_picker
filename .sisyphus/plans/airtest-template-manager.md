@@ -70,7 +70,6 @@ Metis consultation encountered system error. Proceeding with self-identified gap
 - `data/`: 数据存储目录
   - `screenshots/`: 截图文件目录
   - `annotations/`: 标注数据JSON文件目录
-- `output/`: 输出目录
   - `templates.py`: 生成的Python模版枚举文件
 
 ### Definition of Done
@@ -260,7 +259,6 @@ Parallel Speedup: ~50% faster than sequential
   **What to do**:
   - [ ] 创建前端源码目录: `src/`, `src/components/`, `src/lib/`, `src/assets/`
   - [ ] 创建数据存储目录: `data/screenshots/`, `data/annotations/`
-  - [ ] 创建输出目录: `output/`
   - [ ] 创建配置文件: `tsconfig.json`, `postcss.config.js`, `tailwind.config.js`
 
   **Must NOT do**:
@@ -595,7 +593,7 @@ Parallel Speedup: ~50% faster than sequential
   - [ ] 创建 `server/lib/pythonGenerator.ts` 实现Python代码生成:
     - 读取所有标注JSON文件
     - 生成Python字典，格式为: `Templates = {'ui_name': Template(r'path/to/image.png', ...)}` 
-    - 每个Template实例包含: `record_pos` 元组 (UI元素位置), `target_pos` 元组 (模板位置), `resolution` 元组
+    - 每个Template实例包含: `record_pos` 元组 (UI元素位置), `target_pos` 目标位置, `resolution` 元组
     - 生成的代码按分组组织
   - [ ] 实现坐标转换: 将标注的矩形框转换为Airtest Template的 `record_pos` 格式
   - [ ] 生成代码写入到 `output/templates.py`

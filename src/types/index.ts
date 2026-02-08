@@ -23,7 +23,7 @@ export interface Annotation {
   id: string;
   name: string;
   rect: Rect; // Absolute coordinates (pixels)
-  relativeRect: Rect; // Relative coordinates (0-1 range)
+  targetPos: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9; // Target position for template matching
   screenshotId: string;
 }
 
@@ -38,6 +38,7 @@ export interface Version {
 export interface AnnotationData {
   screenshotId: string;
   currentAnnotations: Annotation[];
+  sourceSize: Rect;
   versions: Version[];
 }
 

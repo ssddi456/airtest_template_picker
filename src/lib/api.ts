@@ -1,4 +1,4 @@
-import type { Screenshot, ApiResponse, ScreenshotListResponse, UploadRequest } from '../types/index';
+import type { Rect, Screenshot, ApiResponse, UploadRequest, Annotation } from '../types/index';
 
 // API base URL - empty means same origin
 const API_BASE = '';
@@ -73,8 +73,8 @@ export async function deleteScreenshot(id: string): Promise<ApiResponse<void>> {
 // Annotation API
 export async function getAnnotations(
   screenshotId: string
-): Promise<ApiResponse<any[]>> {
-  return apiRequest<any[]>(`/api/annotations/${screenshotId}`);
+): Promise<ApiResponse<import('../types/index').AnnotationData>> {
+  return apiRequest<import('../types/index').AnnotationData>(`/api/annotations/${screenshotId}`);
 }
 
 export async function getAllAnnotations(): Promise<ApiResponse<any[]>> {
@@ -101,21 +101,23 @@ export async function getAllAnnotations(): Promise<ApiResponse<any[]>> {
 
 export async function saveAnnotations(
   screenshotId: string,
-  annotations: any[]
+  sourceSize: Rect,
+  annotations: Annotation[]
 ): Promise<ApiResponse<any>> {
   return apiRequest<any>(`/api/annotations/${screenshotId}`, {
     method: 'POST',
-    body: JSON.stringify({ annotations }),
+    body: JSON.stringify({ sourceSize, annotations }),
   });
 }
 
 export async function updateAnnotations(
   screenshotId: string,
-  annotations: any[]
+  sourceSize: Rect,
+  annotations: Annotation[]
 ): Promise<ApiResponse<any>> {
   return apiRequest<any>(`/api/annotations/${screenshotId}`, {
     method: 'PUT',
-    body: JSON.stringify({ annotations }),
+    body: JSON.stringify({ sourceSize, annotations }),
   });
 }
 
@@ -139,5 +141,11 @@ export async function generatePython(): Promise<ApiResponse<{ code: string }>> {
   return apiRequest<{ code: string }>('/api/python/generate', {
     method: 'POST',
     body: JSON.stringify({}),
+  });
+}
+
+export async function getPythonCode(): Promise<ApiResponse<{ code: string | null; message?: string }>> {
+  return apiRequest<{ code: string | null; message?: string }>('/api/python', {
+    method: 'GET',
   });
 }

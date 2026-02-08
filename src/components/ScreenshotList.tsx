@@ -26,7 +26,7 @@ export default function ScreenshotList() {
   const [uploadName, setUploadName] = useState('');
   const [uploadGroup, setUploadGroup] = useState<Group>('other');
   const [dragOver, setDragOver] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // 加载截图列表
@@ -118,10 +118,10 @@ export default function ScreenshotList() {
   const groups: (Group | 'all')[] = ['all', 'login', 'game_main', 'gameplay', 'other'];
 
   return (
-    <div className="flex gap-6">
+    <div className="flex gap-6 mt-6">
       {/* 左侧：上传区域 */}
       <aside className="w-80 flex-shrink-0">
-        <div className="bg-white rounded-lg shadow p-6 sticky top-6">
+        <div className="bg-white rounded-lg shadow -6 sticky top-6">
           <h2 className="text-xl font-semibold mb-4">上传截图</h2>
 
           <div className="space-y-4 mb-4">
@@ -199,7 +199,7 @@ export default function ScreenshotList() {
       {/* 右侧：截图列表 */}
       <main className="flex-1">
         {/* 搜索和筛选 */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
+        <div className="bg-white mb-6">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -275,7 +275,7 @@ export default function ScreenshotList() {
         )}
 
         {/* 截图列表 */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white">
           <h2 className="text-xl font-semibold mb-4">
             截图列表 ({filteredScreenshots.length})
           </h2>
@@ -292,7 +292,7 @@ export default function ScreenshotList() {
 
           {!loading && filteredScreenshots.length > 0 && (
             <div className="space-y-8">
-              {groups.filter((g): g is Group => g !== 'all' && groupedScreenshots[g]?.length > 0).map((group) => (
+              {groups.filter((g): g is Group => g !== 'all' && (groupedScreenshots[g]?.length || 0) > 0).map((group) => (
                 <div key={group as string}>
                   <h3 className="text-lg font-semibold mb-4 text-gray-700">
                     {GROUP_NAMES[group as Group | 'all']} ({groupedScreenshots[group as string]?.length || 0})
@@ -302,7 +302,7 @@ export default function ScreenshotList() {
                       {(groupedScreenshots[group as string] || []).map((screenshot) => (
                         <div
                           key={screenshot.id}
-                          className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                          className="border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
                         >
                           <Link
                             to={`/screenshots/${screenshot.id}`}
@@ -331,7 +331,7 @@ export default function ScreenshotList() {
                             <div className="flex gap-2">
                               <Link
                                 to={`/screenshots/${screenshot.id}`}
-                                className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm text-center"
+                                className="flex-1 px-2 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm text-center"
                               >
                                 标注
                               </Link>
@@ -340,7 +340,7 @@ export default function ScreenshotList() {
                                   e.preventDefault();
                                   handleDelete(screenshot.id);
                                 }}
-                                className="flex-1 px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm"
+                                className="flex-1 px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm"
                               >
                                 删除
                               </button>
@@ -354,11 +354,11 @@ export default function ScreenshotList() {
                       {(groupedScreenshots[group as string] || []).map((screenshot) => (
                         <div
                           key={screenshot.id}
-                          className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer flex"
+                          className="border border-gray-200 overflow-hidden hover:shadow-md transition-shadow cursor-pointer flex"
                         >
                           <Link
                             to={`/screenshots/${screenshot.id}`}
-                            className="w-48 aspect-video bg-gray-100 relative flex-shrink-0"
+                            className="w-32 aspect-video bg-gray-100 relative"
                           >
                             <img
                               src={`/data/screenshots/${screenshot.filename}`}
@@ -367,16 +367,16 @@ export default function ScreenshotList() {
                             />
                           </Link>
 
-                          <div className="flex-1 p-4 flex items-center justify-between">
+                          <div className="flex-1 p-2 flex items-center justify-between">
                             <div className="flex-1">
-                              <h3 className="font-semibold text-lg mb-1">
+                              <h3 className="font-semibold mb-1">
                                 {screenshot.name}
                               </h3>
                               <div className="flex items-center gap-3">
                                 <span className="px-2 py-1 bg-gray-100 text-xs font-medium rounded">
                                   {GROUP_NAMES[screenshot.group]}
                                 </span>
-                                <span className="text-sm text-gray-500">
+                                <span className="text-xs text-gray-500">
                                   {new Date(screenshot.uploadTime).toLocaleString('zh-CN')}
                                 </span>
                               </div>
@@ -385,7 +385,7 @@ export default function ScreenshotList() {
                             <div className="flex gap-2 ml-4">
                               <Link
                                 to={`/screenshots/${screenshot.id}`}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                                className="px-2 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
                               >
                                 标注
                               </Link>
@@ -394,7 +394,7 @@ export default function ScreenshotList() {
                                   e.preventDefault();
                                   handleDelete(screenshot.id);
                                 }}
-                                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm"
+                                className="px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm"
                               >
                                 删除
                               </button>

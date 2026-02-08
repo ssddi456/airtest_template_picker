@@ -10,8 +10,7 @@ Airtest Template Manager is a full-stack web application built with React (front
 airtest_template_picker/
 ├── data/                       # Data storage directory
 │   ├── screenshots/            # Uploaded image files
-│   └── annotations/           # Annotation JSON files (version history)
-├── output/                      # Generated output files
+│   ├── annotations/           # Annotation JSON files (version history)
 │   └── templates.py          # Auto-generated Python code
 ├── server/                      # Backend server code
 │   ├── api/                  # API route handlers

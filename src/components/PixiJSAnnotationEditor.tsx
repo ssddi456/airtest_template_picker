@@ -1,6 +1,9 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { getAnnotations, saveAnnotations } from '../lib/api';
-import { PixiJSCore, AnnotationData, PixiJSCoreCallbacks } from '../lib/PixiJSCore';
+import { PixiJSCore, AnnotationData as PixiAnnotationData, PixiJSCoreCallbacks } from '../lib/PixiJSCore';
+import type { AnnotationData as ApiAnnotationData, Annotation } from '../types/index';
+import { isSameAnnotationData } from '../lib/data';
+import AnnotationTabs from './AnnotationTabs';
 
 interface PixiJSAnnotationEditorProps {
   screenshotId: string;
@@ -15,78 +18,134 @@ export default function PixiJSAnnotationEditor({
 }: PixiJSAnnotationEditorProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const pixiCoreRef = useRef<PixiJSCore | null>(null);
-
-  const [annotations, setAnnotations] = useState<AnnotationData[]>([]);
+  const [initiated, setInitiated] = useState(false);
+  const [annotationData, setAnnotationData] = useState<ApiAnnotationData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
   const [editingLabel, setEditingLabel] = useState<string>('');
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+  const [selectedTargetPos, setSelectedTargetPos] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9>(5);
+
+  // 加载标注数据
+  const loadAnnotations = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    const result = await getAnnotations(screenshotId);
+    setLoading(false);
+
+    if (result.success && result.data) {
+      if (!isSameAnnotationData(annotationData, result.data)) {
+        setAnnotationData(result.data);
+      }
+        pixiCoreRef.current?.setAnnotations(result.data.currentAnnotations);
+    } else if (result.error) {
+      setError(result.error);
+    }
+  }, [screenshotId, annotationData]);
+
+  // 将 PixiAnnotationData 转换为 Annotation，保留 targetPos
+  const convertToAnnotation = useCallback((pixiAnn: PixiAnnotationData, existingAnnotations: Annotation[]): Annotation => {
+    const existing = existingAnnotations.find(e => e.id === pixiAnn.id);
+    return {
+      id: pixiAnn.id,
+      name: pixiAnn.name,
+      rect: pixiAnn.rect,
+      targetPos: existing?.targetPos || 5,
+      screenshotId,
+    };
+  }, [screenshotId]);
 
   // 初始化 PixiJS 应用
   useEffect(() => {
     if (!canvasRef.current || !screenshotPath) return;
-    // 加载标注数据
-    const loadAnnotations = async () => {
-      setLoading(true);
-      setError(null);
 
-      const result = await getAnnotations(screenshotId);
-      setLoading(false);
+    const callbacks: PixiJSCoreCallbacks = {
+      onAnnotationSelected: (id: string, label: string) => {
+        setSelectedAnnotationId(id);
+        setEditingLabel(label);
+        // 从 annotationData 中获取 targetPos
+        const ann = annotationData?.currentAnnotations.find(a => a.id === id);
+        if (ann) {
+          setSelectedTargetPos(ann.targetPos);
+        }
+      },
+      onAnnotationCreated: async (annotation: PixiAnnotationData) => {
+        setLoading(true);
+        console.log('Annotation created:', annotation);
 
-      if (result.success && result.data) {
-        pixiCoreRef.current?.setAnnotations(result.data);
-        setAnnotations(result.data);
-      } else if (result.error) {
-        setError(result.error);
-      }
+        // 创建新标注时添加 targetPos 字段（默认值为 1）
+        const existingAnnotations = annotationData?.currentAnnotations || [];
+        const newAnnotation = convertToAnnotation(annotation, existingAnnotations);
+
+        const pixiAnnotations = pixiCoreRef.current?.getAllAnnotations() || [];
+        const allAnnotations: Annotation[] = [
+          ...pixiAnnotations.map(ann => convertToAnnotation(ann, existingAnnotations)),
+          newAnnotation
+        ];
+
+        await saveAnnotations(
+          screenshotId,
+          { x: 0, y: 0, width: imageSize.width, height: imageSize.height },
+          allAnnotations);
+        await loadAnnotations();
+        setLoading(false);
+      },
+      onAnnotationUpdated: async (id: string, rect: PixiAnnotationData['rect']) => {
+        setLoading(true);
+
+        console.log('Annotation updated:', id, rect);
+        const pixiAnnotations = pixiCoreRef.current?.getAllAnnotations() || [];
+
+        // 保留 targetPos
+        const existingAnnotations = annotationData?.currentAnnotations || [];
+        const annotations: Annotation[] = pixiAnnotations.map((ann) => convertToAnnotation(ann, existingAnnotations));
+
+        await saveAnnotations(screenshotId, {
+          x: 0, y: 0, width: imageSize.width, height: imageSize.height
+        },annotations);
+        await loadAnnotations();
+        setLoading(false);
+      },
+      onImageLoaded: (width: number, height: number) => {
+        setImageSize({ width, height });
+      },
     };
-
     const initApp = () => {
-      const callbacks: PixiJSCoreCallbacks = {
-        onAnnotationSelected: (id: string, label: string) => {
-          setSelectedAnnotationId(id);
-          setEditingLabel(label);
-        },
-        onAnnotationCreated: async (annotation: AnnotationData) => {
-          setLoading(true);
-          console.log('Annotation created:', annotation);
-          await saveAnnotations(screenshotId, [...(pixiCoreRef.current?.getAllAnnotations() || []), annotation]);
-          await loadAnnotations();
-          setLoading(false);
-        },
-        onAnnotationUpdated: async (id: string, rect: AnnotationData['rect']) => {
-          setLoading(true);
-
-          console.log('Annotation updated:', id, rect);
-          await saveAnnotations(screenshotId, pixiCoreRef.current?.getAllAnnotations() || []);
-          await loadAnnotations();
-          setLoading(false);
-        },
-        onImageLoaded: (width: number, height: number) => {
-          setImageSize({ width, height });
-        },
-      };
 
       if (!pixiCoreRef.current) {
         const pixiCore = new PixiJSCore(callbacks);
         pixiCoreRef.current = pixiCore;
         pixiCoreRef.current.initialize(canvasRef.current!, screenshotPath);
-        pixiCoreRef.current.setAnnotations(annotations);
+        if (annotationData) {
+          pixiCoreRef.current.setAnnotations(annotationData.currentAnnotations);
+        }
       } else {
         pixiCoreRef.current.updateCallbacks(callbacks);
       }
 
     };
 
-    initApp();
-    loadAnnotations();
+    if (!initiated) {
+      setInitiated(true);
+      loadAnnotations();
+      initApp();
+    } else {
+      pixiCoreRef.current!.updateCallbacks(callbacks);
+    }
 
     return () => {
     };
-  }, [canvasRef.current, screenshotPath]);
-
+  }, [
+    canvasRef.current,
+    initiated,
+    screenshotPath,
+    annotationData, 
+    loadAnnotations,
+    convertToAnnotation
+  ]);
 
 
   // 全局鼠标事件
@@ -107,10 +166,16 @@ export default function PixiJSAnnotationEditor({
 
     const handleGlobalMouseUp = (e: MouseEvent) => {
       console.log('Global mouse up:', e.clientX, e.clientY);
-      if (!pixiCoreRef.current) return;
+      if (!pixiCoreRef.current) {
+        console.log('No pixiCoreRef on mouse up');
+        return;
+      }
 
       const rect = canvasRef.current?.getBoundingClientRect();
-      if (!rect) return;
+      if (!rect) {
+        console.log('No canvas rect on mouse up');
+        return;
+      }
 
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
@@ -158,25 +223,42 @@ export default function PixiJSAnnotationEditor({
     setError(null);
 
     try {
-      const annotations = pixiCoreRef.current.getAllAnnotations().map((ann) => ({
-        id: ann.id,
-        name: ann.name,
-        rect: ann.rect,
-        relativeRect: {
-          x: ann.rect.x / imageSize.width,
-          y: ann.rect.y / imageSize.height,
-          width: ann.rect.width / imageSize.width,
-          height: ann.rect.height / imageSize.height,
-        },
-        screenshotId,
-      }));
+      const pixiAnnotations = pixiCoreRef.current.getAllAnnotations();
 
-      const result = await saveAnnotations(screenshotId, annotations);
+      // 获取现有的 annotations 数据以保留 targetPos
+      const existingAnnotations = annotationData?.currentAnnotations || [];
+
+      const annotations: Annotation[] = pixiAnnotations.map((ann) => {
+        // 如果是当前选中的标注，使用 selectedTargetPos，否则使用现有值
+        if (ann.id === selectedAnnotationId) {
+          return {
+            id: ann.id,
+            name: ann.name,
+            rect: ann.rect,
+            targetPos: selectedTargetPos,
+            screenshotId,
+          };
+        }
+
+        const existing = existingAnnotations.find(e => e.id === ann.id);
+        return {
+          id: ann.id,
+          name: ann.name,
+          rect: ann.rect,
+          targetPos: existing?.targetPos || 5, // 默认值为 5
+          screenshotId,
+        };
+      });
+
+      const result = await saveAnnotations(
+        screenshotId,
+        { x: 0, y: 0, width: imageSize.width, height: imageSize.height },
+         annotations);
 
       setSaving(false);
 
       if (result.success) {
-        alert('Annotations saved successfully!');
+        await loadAnnotations();
       } else {
         setError(result.error || 'Failed to save annotations');
       }
@@ -189,10 +271,7 @@ export default function PixiJSAnnotationEditor({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-semibold mb-2">
-          PixiJS Annotation Editor (gl2D Format)
-        </h2>
+      <div className="bg-white rounded-lg shadow m-6">
         <p className="text-gray-600">{screenshotName} - Draw rectangles to annotate UI elements</p>
         <div className="text-sm text-gray-500 mt-2">
           Controls: Scroll to zoom • Drag selected boxes to move • Drag corners to resize
@@ -206,150 +285,72 @@ export default function PixiJSAnnotationEditor({
         </div>
       )}
 
-      {/* PixiJS Canvas Container */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="mb-4 flex justify-between items-center">
-          <div className="text-sm text-gray-600">
-            {imageSize.width > 0 ? (
-              <span>
-                Image: {imageSize.width} x {imageSize.height} pixels | Scale: Auto (Use mouse wheel)
-              </span>
-            ) : (
-              <span className="text-yellow-600">
-                Loading image... (Path: {screenshotPath})
-              </span>
-            )}
-          </div>
-          <div className="space-x-2">
-            {selectedAnnotationId && (
+      {/* PixiJS Canvas Container & Annotation Tabs */}
+      <div className="flex gap-6 m-6">
+        {/* Left: Canvas */}
+        <div className="flex-1 bg-white rounded-lg shadow flex flex-col">
+          <div className="mb-4 flex justify-between items-center sticky top-0 bg-white pt-4 pb-2 z-10 px-6">
+            <div className="text-sm text-gray-600">
+              {imageSize.width > 0 ? (
+                <span>
+                  Image: {imageSize.width} x {imageSize.height} pixels | Scale: Auto (Use mouse wheel)
+                </span>
+              ) : (
+                <span className="text-yellow-600">
+                  Loading image... (Path: {screenshotPath})
+                </span>
+              )}
+            </div>
+            <div className="space-x-2">
               <button
-                onClick={handleDelete}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                onClick={() => {
+                  // Reset view to default (handled by pixi-viewport)
+                  if (pixiCoreRef.current) {
+                    pixiCoreRef.current.resetView();
+                  }
+                }}
+                className="px-2 py-1 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
               >
-                Delete Selected
+                Reset View
               </button>
-            )}
-            <button
-              onClick={() => {
-                // Reset view to default (handled by pixi-viewport)
-                if (pixiCoreRef.current) {
-                  pixiCoreRef.current.resetView();
-                }
-              }}
-              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
-            >
-              Reset View
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-            >
-              {saving ? 'Saving...' : 'Save Annotations'}
-            </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="px-2 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+              >
+                {saving ? 'Saving...' : 'Save Annotations'}
+              </button>
+            </div>
           </div>
-        </div>
 
-        <div
-          ref={canvasRef}
-          className="border border-gray-300 rounded bg-gray-100 cursor-crosshair"
-          style={{ width: '100%', height: '600px', overflow: 'hidden' }}
-        />
-
-        <p className="mt-2 text-sm text-gray-600">
-          Click and drag to draw rectangles. Click on a rectangle to select it.
-          Selected boxes can be moved (drag) or resized (corner handles). Use mouse wheel to zoom.
-        </p>
-      </div>
-
-      {/* Selected Annotation Details */}
-      {selectedAnnotationId && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">Selected Annotation</h3>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-            <input
-              type="text"
-              value={editingLabel}
-              onChange={(e) => {
-                updateAnnotationLabel(selectedAnnotationId, e.target.value);
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          <div className="flex-1 px-6 pb-6">
+            <div
+              ref={canvasRef}
+              className={`
+                border border-gray-300 rounded bg-gray-100 cursor-crosshair
+                h-150
+              `}
+              style={{ width: '100%', overflow: 'hidden' }}
             />
           </div>
-
-          {pixiCoreRef.current && pixiCoreRef.current.getAnnotation(selectedAnnotationId) && (
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-gray-50 p-4 rounded-md">
-                <h5 className="text-sm font-medium text-gray-700 mb-2">
-                  Absolute (Pixels)
-                </h5>
-                <div className="text-sm space-y-1 text-gray-600">
-                  {(() => {
-                    const ann = pixiCoreRef.current?.getAnnotation(selectedAnnotationId);
-                    return ann ? (
-                      <>
-                        <div>X: {ann.rect.x}</div>
-                        <div>Y: {ann.rect.y}</div>
-                        <div>Width: {ann.rect.width}</div>
-                        <div>Height: {ann.rect.height}</div>
-                      </>
-                    ) : null;
-                  })()}
-                </div>
-              </div>
-
-              <div className="bg-gray-50 p-4 rounded-md">
-                <h5 className="text-sm font-medium text-gray-700 mb-2">
-                  Relative (0-1)
-                </h5>
-                <div className="text-sm space-y-1 text-gray-600">
-                  {(() => {
-                    const ann = pixiCoreRef.current?.getAnnotation(selectedAnnotationId);
-                    return ann ? (
-                      <>
-                        <div>X: {(ann.rect.x / imageSize.width).toFixed(3)}</div>
-                        <div>Y: {(ann.rect.y / imageSize.height).toFixed(3)}</div>
-                        <div>Width: {(ann.rect.width / imageSize.width).toFixed(3)}</div>
-                        <div>Height: {(ann.rect.height / imageSize.height).toFixed(3)}</div>
-                      </>
-                    ) : null;
-                  })()}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
-      )}
 
-      {/* Annotations List */}
-      {annotations.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">
-            All Annotations ({annotations.length})
-          </h3>
-
-          <div className="space-y-2">
-            {annotations.map((ann) => (
-              <div
-                key={ann.id}
-                onClick={() => selectAnnotation(ann.id, ann.name)}
-                className={`p-3 border rounded cursor-pointer transition-colors ${
-                  selectedAnnotationId === ann.id
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="font-medium">{ann.name}</div>
-                <div className="text-sm text-gray-600">
-                  ({ann.rect.x}, {ann.rect.y}, {ann.rect.width}, {ann.rect.height})
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* Right: Annotation Tabs */}
+        <div className="w-80 flex-shrink-0">
+          <AnnotationTabs
+            annotations={annotationData?.currentAnnotations || []}
+            selectedAnnotationId={selectedAnnotationId}
+            editingLabel={editingLabel}
+            selectedTargetPos={selectedTargetPos}
+            imageSize={imageSize}
+            pixiCoreRef={pixiCoreRef}
+            onLabelChange={updateAnnotationLabel}
+            onTargetPosChange={setSelectedTargetPos}
+            onSelectAnnotation={selectAnnotation}
+            onDelete={handleDelete}
+          />
         </div>
-      )}
+      </div>
     </div>
   );
 }

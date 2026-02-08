@@ -53,9 +53,6 @@
   - 更新了 `src/App.tsx` 集成组件
 
 - [x] 11. 版本历史和预览组件
-  - 创建了 `src/components/VersionHistory.tsx` - 版本历史UI
-  - 显示所有历史版本
-  - 支持回滚到指定版本
   - 创建了 `src/components/PythonPreview.tsx` - Python代码预览
   - 支持生成Python代码
   - 支持复制到剪贴板
@@ -75,7 +72,6 @@
 - src/lib/api.ts
 - src/components/ScreenshotManager.tsx
 - src/components/PixiJSAnnotationEditor.tsx
-- src/components/VersionHistory.tsx
 - src/components/PythonPreview.tsx
 - README.md
 - ARCHITECTURE.md

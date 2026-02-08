@@ -1,13 +1,12 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import type { Annotation, AnnotationData, Version } from '../../src/types/index';
+import type { Annotation, Rect } from '../../src/types/index';
 import {
   saveAnnotation,
   loadAnnotation,
-  getAllAnnotations,
-  deleteAnnotation,
   rollbackVersion,
 } from '../lib/fileStorage';
+import { generatePythonCode } from './pythonRoutes';
 
 const router = Router();
 
@@ -21,7 +20,7 @@ router.get('/:screenshotId', async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: 'Annotations not found' });
     }
 
-    res.json({ success: true, data: data.currentAnnotations });
+    res.json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, error: String(error) });
   }
@@ -31,13 +30,20 @@ router.get('/:screenshotId', async (req: Request, res: Response) => {
 router.post('/:screenshotId', async (req: Request, res: Response) => {
   try {
     const { screenshotId } = req.params as { screenshotId: string };
-    const { annotations } = req.body as { annotations: Annotation[] };
+    const { annotations, sourceSize } = req.body as { annotations: Annotation[]; sourceSize: Rect };
 
     if (!Array.isArray(annotations)) {
       return res.status(400).json({ success: false, error: 'Invalid annotations format' });
     }
 
-    await saveAnnotation(screenshotId, annotations);
+    await saveAnnotation(screenshotId, sourceSize, annotations);
+
+    // Auto-generate Python code after saving annotations
+    const pythonResult = await generatePythonCode();
+    if (!pythonResult.success) {
+      console.error('Failed to generate Python code:', pythonResult.error);
+      // Don't fail the save if Python generation fails
+    }
 
     res.json({ success: true, data: { message: 'Annotations saved', versionCount: (await loadAnnotation(screenshotId))?.versions.length || 0 } });
   } catch (error) {
@@ -49,15 +55,22 @@ router.post('/:screenshotId', async (req: Request, res: Response) => {
 router.put('/:screenshotId', async (req: Request, res: Response) => {
   try {
     const { screenshotId } = req.params as { screenshotId: string };
-    const { annotations } = req.body as { annotations: Annotation[] };
+    const { annotations, sourceSize } = req.body as { annotations: Annotation[]; sourceSize: Rect };
 
     if (!Array.isArray(annotations)) {
       return res.status(400).json({ success: false, error: 'Invalid annotations format' });
     }
 
-    await saveAnnotation(screenshotId, annotations);
+    await saveAnnotation(screenshotId, sourceSize, annotations);
 
-    res.json({ success: true, data: { message: 'Annotations updated' } });
+    // Auto-generate Python code after saving annotations
+    const pythonResult = await generatePythonCode();
+    if (!pythonResult.success) {
+      console.error('Failed to generate Python code:', pythonResult.error);
+      // Don't fail the save if Python generation fails
+    }
+
+    res.json({ success: true, data: { message: 'Annotations updated', versionCount: (await loadAnnotation(screenshotId))?.versions.length || 0 } });
   } catch (error) {
     res.status(500).json({ success: false, error: String(error) });
   }
@@ -86,6 +99,13 @@ router.post('/:screenshotId/rollback/:versionId', async (req: Request, res: Resp
     const versionIndex = parseInt(versionId, 10);
 
     const data = await rollbackVersion(screenshotId, versionIndex);
+
+    // Auto-generate Python code after rollback
+    const pythonResult = await generatePythonCode();
+    if (!pythonResult.success) {
+      console.error('Failed to generate Python code:', pythonResult.error);
+      // Don't fail the rollback if Python generation fails
+    }
 
     res.json({ success: true, data: data });
   } catch (error) {

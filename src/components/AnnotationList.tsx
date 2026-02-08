@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Screenshot, Group, Annotation } from '../types/index';
+import type { Screenshot, Group, Annotation, AnnotationData } from '../types/index';
 import {
   getScreenshots,
   getAnnotations,
@@ -15,13 +15,13 @@ const GROUP_NAMES: Record<Group | 'all', string> = {
   'other': '其他',
 };
 
-// 扩展的截图信息，包含标注
-interface ScreenshotWithAnnotations extends Screenshot {
-  annotations: Annotation[];
+// 扩展的截图信息，包含标注数据
+interface ScreenshotWithAnnotationData extends Screenshot {
+  annotationData: AnnotationData | null;
 }
 
 export default function AnnotationList() {
-  const [screenshotsWithAnnotations, setScreenshotsWithAnnotations] = useState<ScreenshotWithAnnotations[]>([]);
+  const [screenshotsWithAnnotationData, setScreenshotsWithAnnotationData] = useState<ScreenshotWithAnnotationData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [groupFilter, setGroupFilter] = useState<Group | 'all'>('all');
@@ -46,12 +46,12 @@ export default function AnnotationList() {
           const annotationsResult = await getAnnotations(screenshot.id);
           return {
             ...screenshot,
-            annotations: annotationsResult.success && annotationsResult.data ? annotationsResult.data : [],
+            annotationData: annotationsResult.success && annotationsResult.data ? annotationsResult.data : null,
           };
         })
       );
 
-      setScreenshotsWithAnnotations(data);
+      setScreenshotsWithAnnotationData(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载数据失败');
     } finally {
@@ -64,7 +64,7 @@ export default function AnnotationList() {
   }, []);
 
   // 过滤和搜索
-  const filteredData = screenshotsWithAnnotations.filter((item) => {
+  const filteredData = screenshotsWithAnnotationData.filter((item) => {
     // 按分组筛选
     if (groupFilter !== 'all' && item.group !== groupFilter) {
       return false;
@@ -73,9 +73,9 @@ export default function AnnotationList() {
     // 按搜索词筛选（标注名称或截图名称）
     if (search) {
       const searchLower = search.toLowerCase();
-      const matchesAnnotation = item.annotations.some(
-        (ann) => ann.name.toLowerCase().includes(searchLower)
-      );
+      const matchesAnnotation = item.annotationData?.currentAnnotations.some(
+        (ann: Annotation) => ann.name.toLowerCase().includes(searchLower)
+      ) || false;
       const matchesScreenshot = item.name.toLowerCase().includes(searchLower);
       return matchesAnnotation || matchesScreenshot;
     }
@@ -88,8 +88,8 @@ export default function AnnotationList() {
     if (!acc[item.group]) {
       acc[item.group] = [];
     }
-    if (item.annotations.length > 0) {
-      item.annotations.forEach((ann) => {
+    if (item.annotationData && item.annotationData.currentAnnotations.length > 0) {
+      item.annotationData.currentAnnotations.forEach((ann: Annotation) => {
         acc[item.group]?.push({
           ...ann,
           screenshotName: item.name,
@@ -110,7 +110,7 @@ export default function AnnotationList() {
   return (
     <div className="space-y-6">
       {/* 标题 */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white rounded-lg shadow m-6">
         <h2 className="text-xl font-semibold mb-2">标注列表</h2>
         <p className="text-gray-600">
           查看所有截图的标注信息，点击标注可进入对应的标注详情页面
@@ -118,7 +118,7 @@ export default function AnnotationList() {
       </div>
 
       {/* 搜索和筛选 */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white rounded-lg shadow m-6">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1">
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -160,9 +160,9 @@ export default function AnnotationList() {
       )}
 
       {/* 标注列表 */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white rounded-lg shadow m-6">
         <h2 className="text-xl font-semibold mb-4">
-          标注信息 ({filteredData.reduce((sum, item) => sum + item.annotations.length, 0)})
+          标注信息 ({filteredData.reduce((sum, item) => sum + (item.annotationData?.currentAnnotations.length || 0), 0)})
         </h2>
 
         {loading && (
@@ -178,26 +178,23 @@ export default function AnnotationList() {
         {!loading && filteredData.length > 0 && (
           <div className="space-y-8">
             {groups.filter((g): g is Group => g !== 'all' && (groupedAnnotations[g]?.length || 0) > 0).map((group) => (
-              <div key={group}>
+              <div key={group} className='px-4'>
                 <h3 className="text-lg font-semibold mb-4 text-gray-700">
                   {GROUP_NAMES[group]} ({(groupedAnnotations[group]?.length || 0)})
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {groupedAnnotations[group]?.map((ann) => (
-                    <div
-                      key={ann.id}
-                      onClick={() => handleAnnotationClick(ann.screenshotId, ann.id)}
-                      className="border border-gray-200 rounded-lg p-4 hover:shadow-lg hover:border-blue-400 transition-all cursor-pointer"
-                    >
-                      <h4 className="font-semibold text-lg mb-2">{ann.name}</h4>
-                      <div className="text-sm text-gray-600 mb-2">
-                        截图: {ann.screenshotName}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        位置: ({ann.rect.x}, {ann.rect.y}, {ann.rect.width}, {ann.rect.height})
-                      </div>
-                    </div>
-                  ))}
+                   {groupedAnnotations[group]?.map((ann) => (
+                     <div
+                       key={ann.id}
+                       onClick={() => handleAnnotationClick(ann.screenshotId, ann.id)}
+                       className="border border-gray-200 rounded-lg p-4 hover:shadow-lg hover:border-blue-400 transition-all cursor-pointer"
+                     >
+                       <h4 className="font-semibold text-lg mb-2">{ann.name}</h4>
+                       <div className="text-sm text-gray-600 mb-2">
+                         截图: {ann.screenshotName}
+                       </div>
+                     </div>
+                   ))}
                 </div>
               </div>
             ))}

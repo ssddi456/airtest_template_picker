@@ -1,9 +1,9 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import type { Screenshot, Annotation, AnnotationData, Version } from '../../src/types/index';
+import type { Annotation, AnnotationData, Rect, Version } from '../../src/types/index';
 
-const ANNOTATIONS_DIR = 'data/annotations';
-const SCREENSHOTS_DIR = 'data/screenshots';
+const ANNOTATIONS_DIR = path.join(process.cwd(), 'data/annotations');
+const SCREENSHOTS_DIR = path.join(process.cwd(), 'data/screenshots');
 
 // Ensure directories exist
 export async function ensureDirectories() {
@@ -17,7 +17,7 @@ function getAnnotationPath(screenshotId: string): string {
 }
 
 // Save annotation data with version history
-export async function saveAnnotation(screenshotId: string, annotations: Annotation[]): Promise<void> {
+export async function saveAnnotation(screenshotId: string, sourceSize: Rect, annotations: Annotation[]): Promise<void> {
   await ensureDirectories();
 
   const annotationPath = getAnnotationPath(screenshotId);
@@ -26,6 +26,7 @@ export async function saveAnnotation(screenshotId: string, annotations: Annotati
   let existingData: AnnotationData = {
     screenshotId,
     currentAnnotations: [],
+    sourceSize: { x:0, y:0, width: 0, height: 0 },
     versions: [],
   };
 
@@ -45,7 +46,12 @@ export async function saveAnnotation(screenshotId: string, annotations: Annotati
 
   // Update with new annotations and version history
   existingData.currentAnnotations = annotations;
+  existingData.sourceSize = sourceSize;
   existingData.versions.push(newVersion);
+
+  if (existingData.versions.length > 20) {
+    existingData.versions.shift();
+  }
 
   // Save to file
   await fs.writeFile(annotationPath, JSON.stringify(existingData, null, 2));

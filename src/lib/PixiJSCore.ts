@@ -12,6 +12,7 @@ export interface AnnotationData {
     width: number;
     height: number;
   };
+  targetPos?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 }
 
 export interface PixiJSCoreCallbacks {
@@ -134,7 +135,9 @@ export class PixiJSCore {
           passiveWheel: false,
         });
         this.viewport = viewport;
+        const minScale = Math.min(width / img.width, height / img.height);
 
+        viewport.setZoom(minScale);
         // 配置 viewport 插件
         viewport
           .drag({
@@ -148,7 +151,7 @@ export class PixiJSCore {
             wheelZoom: true,
           })
           .clampZoom({
-            minScale: 0.5,
+            minScale: minScale,
             maxScale: 3,
           })
           .decelerate({
@@ -223,9 +226,10 @@ export class PixiJSCore {
         this.isDragging = false;
         this.log('Space key pressed - switching to move mode');
         this.viewport!.plugins.resume('drag');
+        this.viewport!.cursor = 'grab';
         this.mouseMode = MouseMode.move;
       }
-    }
+    } 
   }
 
   handleSpaceKeyUp = (e: KeyboardEvent): void => {
@@ -233,7 +237,16 @@ export class PixiJSCore {
       e.preventDefault();
       this.log('Space key released - switching to select mode');
       this.viewport!.plugins.pause('drag');
+      this.viewport!.cursor = 'default';
       this.mouseMode = MouseMode.select;
+    } else if (e.code === 'Escape') {
+      e.preventDefault();
+      this.isDrawing = false;
+      this.drawStart = null;
+      if (this.drawingRect) {
+        this.drawingRect.clear();
+      }
+      this.log('Escape key pressed - cancelling drawing');
     }
   }
 
@@ -252,7 +265,6 @@ export class PixiJSCore {
 
     console.log('Rendering annotations:', annotations);
 
-    const sprite = this.imageSprite;
     const graphics = this.drawingRect;
     graphics.clear();
 
@@ -264,11 +276,6 @@ export class PixiJSCore {
     });
     this.annotationStates.clear();
 
-    const scaleX = sprite.scale.x;
-    const scaleY = sprite.scale.y;
-    const spriteX = sprite.x ?? 0;
-    const spriteY = sprite.y ?? 0;
-
     // 渲染每个标注
     annotations.forEach((ann) => {
       const rect = ann.rect;
@@ -277,9 +284,8 @@ export class PixiJSCore {
 
       // 创建标注容器
       const container = new PIXI.Container();
-      container.x = rect.x * scaleX + spriteX;
-      container.y = rect.y * scaleY + spriteY;
-      container.scale.set(scaleX, scaleY);
+      container.x = rect.x;
+      container.y = rect.y;
       container.zIndex = 0;
 
       // 创建矩形图形
@@ -348,23 +354,14 @@ export class PixiJSCore {
     }
 
     // 检查是否点到其他标注上
-    await new Promise(resolve => setTimeout(resolve, 100)); // 等待事件冒泡完成
     if (this.selectedAnnotationId) {
       this.log('Clicked on annotation, not starting new one');
       return;
     }
 
-    const sprite = this.imageSprite;
-    const globalX = event.global.x;
-    const globalY = event.global.y;
-
-    // 转换到图像坐标
-    const localX = (globalX - (sprite.x ?? 0)) / sprite.scale.x;
-    const localY = (globalY - (sprite.y ?? 0)) / sprite.scale.y;
-
-    // 开始绘制
+      // 开始绘制
     this.isDrawing = true;
-    this.drawStart = { x: localX, y: localY };
+    this.drawStart = { x: event.global.x, y: event.global.y };
 
     // 清除绘制矩形
     if (this.drawingRect) {
@@ -388,23 +385,20 @@ export class PixiJSCore {
     const globalX = event.global.x;
     const globalY = event.global.y;
 
-    const localX = (globalX - (sprite.x ?? 0)) / sprite.scale.x;
-    const localY = (globalY - (sprite.y ?? 0)) / sprite.scale.y;
-
     const graphics = this.drawingRect;
     graphics.clear();
     graphics.fillStyle = 0x3b82f6;
     // 绘制正在绘制的矩形
-    const x = Math.min(this.drawStart.x, localX);
-    const y = Math.min(this.drawStart.y, localY);
-    const width = Math.abs(localX - this.drawStart.x);
-    const height = Math.abs(localY - this.drawStart.y);
+    const x = Math.min(this.drawStart.x, globalX);
+    const y = Math.min(this.drawStart.y, globalY);
+    const width = Math.abs(globalX - this.drawStart.x);
+    const height = Math.abs(globalY - this.drawStart.y);
 
     graphics.rect(
-      x * sprite.scale.x + (sprite.x ?? 0),
-      y * sprite.scale.y + (sprite.y ?? 0),
-      width * sprite.scale.x,
-      height * sprite.scale.y
+      x,
+      y,
+      width,
+      height 
     );
     console.log('Drawing rectangle at:', x, y, width, height);
     graphics.stroke({ color: 0x3b82f6, width: 2 });
@@ -423,12 +417,13 @@ export class PixiJSCore {
 
     const globalX = event.global.x;
     const globalY = event.global.y;
+    const scaleX = this.viewport?.worldTransform.a ?? 1;
+    const scaleY = this.viewport?.worldTransform.d ?? 1;
+    const spriteX = this.viewport?.worldTransform.tx ?? 0;
+    const spriteY = this.viewport?.worldTransform.ty ?? 0;
 
-    const localX = (globalX - (sprite.x ?? 0)) / sprite.scale.x;
-    const localY = (globalY - (sprite.y ?? 0)) / sprite.scale.y;
-
-    const width = Math.abs(localX - this.drawStart.x);
-    const height = Math.abs(localY - this.drawStart.y);
+    const width = Math.abs(globalX - this.drawStart.x) / scaleX;
+    const height = Math.abs(globalY - this.drawStart.y) / scaleY;
 
     // 忽略太小的矩形
     if (width < 10 || height < 10) {
@@ -440,8 +435,8 @@ export class PixiJSCore {
     }
 
     // 创建新标注
-    const x = Math.min(this.drawStart.x, localX);
-    const y = Math.min(this.drawStart.y, localY);
+    const x = (Math.min(this.drawStart.x, event.global.x) - spriteX) / scaleX;
+    const y = (Math.min(this.drawStart.y, event.global.y) - spriteY) / scaleY;
     const id = uuidv4();
     const label = `Annotation ${this.annotationStates.size + 1}`;
 
@@ -471,17 +466,20 @@ export class PixiJSCore {
     if (!ann) return;
 
     const sprite = this.imageSprite;
-    if (!sprite) return;
+    if (!sprite || !this.originalPosition) return;
 
     event.stopPropagation();
 
     const globalX = event.global.x;
     const globalY = event.global.y;
+    const scaleX = this.viewport?.worldTransform.a ?? 1;
+    const scaleY = this.viewport?.worldTransform.d ?? 1;
+
 
     if (this.isResizing && this.originalPosition) {
       // 调整大小
-      const dx = (globalX - this.dragStart!.x) / sprite.scale.x;
-      const dy = (globalY - this.dragStart!.y) / sprite.scale.y;
+      const dx = (globalX - this.dragStart!.x) / scaleX;
+      const dy = (globalY - this.dragStart!.y) / scaleY;
 
       const handle = this.resizeHandle!;
       let newWidth = this.originalPosition.width;
@@ -523,10 +521,9 @@ export class PixiJSCore {
           this.updateAnnotationPosition(annotationId, ann.x + dx, ann.y + dy, ann.width, ann.height);
           return;
       }
-
       // 更新标注
+      this.updateAnnotationPosition(annotationId, newX, newY, newWidth, newHeight);
     } 
-    this.callbacks.onAnnotationUpdated?.(annotationId, { x: ann.x, y: ann.y, width: ann.width, height: ann.height });
   }
 
   /**
@@ -545,12 +542,10 @@ export class PixiJSCore {
     const sprite = this.imageSprite;
     if (!sprite) return;
 
-    const scaleX = sprite.scale.x;
-    const scaleY = sprite.scale.y;
 
     // 更新容器位置
-    ann.pixiContainer.x = newX * scaleX + (sprite.x ?? 0);
-    ann.pixiContainer.y = newY * scaleY + (sprite.y ?? 0);
+    ann.pixiContainer.x = newX;
+    ann.pixiContainer.y = newY;
 
     // 更新标注数据
     this.annotationStates.set(id, {
@@ -643,9 +638,9 @@ export class PixiJSCore {
    */
   resetView(): void {
     if (!this.viewport) return;
-
+    
     // 重置缩放和位置到初始状态
-    this.viewport.setZoom(1);
+    this.viewport.fit();
     this.viewport.moveCorner(0, 0);
   }
 
