@@ -286,7 +286,7 @@ Parallel Speedup: ~50% faster than sequential
   - Project structure defined in draft: `.sisyphus/drafts/airtest-template-manager.md` - Directory layout requirements
 
   **WHY Each Reference Matters** (explain the relevance):
-  - Draft file: Contains the agreed-upon directory structure for screenshots, annotations, and output
+  - Draft file: Contains the agreed-upon directory structure for screenshots, annotations, and data
 
   **Acceptance Criteria**:
 
@@ -297,7 +297,7 @@ Parallel Speedup: ~50% faster than sequential
   **For directory structure** (using Bash):
   ```bash
   # Agent runs:
-  ls -la src/ src/components/ src/lib/ data/screenshots/ data/annotations/ output/
+  ls -la src/ src/components/ src/lib/ data/screenshots/ data/annotations/ data/
   # Assert: All directories exist
   ```
 
@@ -575,7 +575,7 @@ Parallel Speedup: ~50% faster than sequential
     -H "Content-Type: application/json" \
     -d '{}'
   # Assert: Returns Python code in response
-  # Assert: output/templates.py file exists
+  # Assert: data/templates.py file exists
   ```
 
   **Evidence to Capture**:
@@ -596,7 +596,7 @@ Parallel Speedup: ~50% faster than sequential
     - 每个Template实例包含: `record_pos` 元组 (UI元素位置), `target_pos` 目标位置, `resolution` 元组
     - 生成的代码按分组组织
   - [ ] 实现坐标转换: 将标注的矩形框转换为Airtest Template的 `record_pos` 格式
-  - [ ] 生成代码写入到 `output/templates.py`
+  - [ ] 生成代码写入到 `data/templates.py`
   - [ ] 在保存标注时自动触发Python生成
 
   **Must NOT do**:
@@ -645,8 +645,8 @@ Parallel Speedup: ~50% faster than sequential
   curl -X POST http://localhost:[PORT]/api/python/generate \
     -H "Content-Type: application/json" \
     -d '{}'
-  # Assert: output/templates.py exists
-  cat output/templates.py
+  # Assert: data/templates.py exists
+  cat data/templates.py
   # Assert: Contains "from airtest.core.api import *"
   # Assert: Contains "Templates = {"
   # Assert: Contains "Template(" and "record_pos"
@@ -1030,13 +1030,13 @@ Parallel Speedup: ~50% faster than sequential
   9. Click: Save Annotation
   10. Click: Python Preview tab
   11. Assert: Python code contains "Login Button"
-  12. Assert: output/templates.py file exists and contains code
+  12. Assert: data/templates.py file exists and contains code
   13. Screenshot: .sisyphus/evidence/task-12-integration.png
   ```
 
   **Evidence to Capture**:
   - [ ] Full workflow screenshots
-  - [ ] output/templates.py content
+  - [ ] data/templates.py content
   - [ ] data/annotations/ JSON file content
   - [ ] Terminal output from npm start
 

@@ -170,14 +170,6 @@ export default function PythonPreview() {
 
         <ol className="list-decimal list-inside space-y-2 text-blue-800">
           <li>保存标注时会自动生成并更新 Python 代码文件</li>
-          <li>此页面每5秒自动刷新一次代码</li>
-          <li>
-            点击"复制到剪贴板"按钮复制代码
-          </li>
-          <li>
-            将代码粘贴到您的 Airtest 测试脚本文件中（通常是{' '}
-            <code>output/templates.py</code> 或类似文件）
-          </li>
           <li>
             在测试脚本中使用 <code>Templates</code> 字典
           </li>

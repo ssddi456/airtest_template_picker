@@ -9,9 +9,9 @@ import path from 'path';
 import sharp from 'sharp';
 
 const router = Router();
-const OUTPUT_FILE = path.join(process.cwd(), 'output', 'templates.py');
-const CROPPED_DIR = path.join(process.cwd(), 'data/cropped');
-const SCREENSHOTS_DIR = path.join(process.cwd(), 'data/screenshots');
+const OUTPUT_FILE = path.join(process.cwd(), 'data', 'templates.py');
+const CROPPED_DIR = path.join(process.cwd(), 'data', 'cropped');
+const SCREENSHOTS_DIR = path.join(process.cwd(), 'data', 'screenshots');
 
 // Clear directory contents
 async function clearDirectory(dirPath: string): Promise<void> {
