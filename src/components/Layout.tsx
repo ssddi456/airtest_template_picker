@@ -17,15 +17,10 @@ export default function Layout({ children }: LayoutProps) {
         </div>
       </header>
 
-      <main className="flex-1 w-180 mx-auto">
+      <main className="flex-1 w-240 mx-auto">
         {children}
       </main>
 
-      <footer className="bg-gray-100 border-t">
-        <div className="max-w-7xl mx-auto px-4 py-4 text-center text-gray-600">
-          <p>© 2026 Airtest Template Manager. Built with React, TailwindCSS, and Rspack.</p>
-        </div>
-      </footer>
     </div>
   );
 }

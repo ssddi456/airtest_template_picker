@@ -88,7 +88,7 @@ Templates = {
 
         pythonCode += `  '${annotation.name}': Template(
     r'${croppedPath}',
-    record_pos=((${annotation.rect.x}, ${annotation.rect.y}),
+    record_pos=((${annotation.rect.x.toFixed(2)}, ${annotation.rect.y.toFixed(2)}),
     target_pos=${annotation.targetPos},
     resolution=(${data.sourceSize.width}, ${data.sourceSize.height})
   ),

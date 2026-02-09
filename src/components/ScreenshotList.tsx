@@ -120,7 +120,7 @@ export default function ScreenshotList() {
   return (
     <div className="flex gap-6 mt-6">
       {/* 左侧：上传区域 */}
-      <aside className="w-80 flex-shrink-0">
+      <aside className="w-60">
         <div className="bg-white rounded-lg shadow -6 sticky top-6">
           <h2 className="text-xl font-semibold mb-4">上传截图</h2>
 
@@ -157,11 +157,10 @@ export default function ScreenshotList() {
           </div>
 
           <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-              dragOver
+            className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${dragOver
                 ? 'border-blue-500 bg-blue-50'
                 : 'border-gray-300 hover:border-gray-400'
-            }`}
+              }`}
             onDragOver={(e) => {
               e.preventDefault();
               setDragOver(true);
@@ -173,7 +172,7 @@ export default function ScreenshotList() {
               ref={fileInputRef}
               type="file"
               accept="image/*"
-              className="hidden"
+              className="opacity-0 w-full h-full absolute top-0 left-0 cursor-pointer"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file?.type.startsWith('image/')) {
@@ -185,7 +184,6 @@ export default function ScreenshotList() {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors w-full"
             >
               {uploading ? '上传中...' : '选择文件或拖放图片'}
             </button>
@@ -230,40 +228,6 @@ export default function ScreenshotList() {
                 ))}
               </select>
             </div>
-
-            <div className="md:w-48">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                视图模式
-              </label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`flex-1 px-4 py-2 rounded-md transition-colors ${
-                    viewMode === 'grid'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                  title="网格视图"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`flex-1 px-4 py-2 rounded-md transition-colors ${
-                    viewMode === 'list'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                  title="列表视图"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
-                </button>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -276,9 +240,37 @@ export default function ScreenshotList() {
 
         {/* 截图列表 */}
         <div className="bg-white">
-          <h2 className="text-xl font-semibold mb-4">
-            截图列表 ({filteredScreenshots.length})
-          </h2>
+          <div className="flex justify-between align-middle pb-2 mb-2 border-b border-gray-200">
+            <h2 className="text-xl font-semibold">
+              截图列表 ({filteredScreenshots.length})
+            </h2>
+            <div>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`flex-1 px-2 py-2 rounded-md transition-colors ${viewMode === 'grid'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                title="网格视图"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`flex-1 px-2 py-2 rounded-md transition-colors ${viewMode === 'list'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                title="列表视图"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+            </div>
+          </div>
 
           {loading && (
             <div className="text-center py-8 text-gray-600">加载中...</div>

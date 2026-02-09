@@ -1,6 +1,6 @@
 import * as PIXI from 'pixi.js';
 import { Viewport } from 'pixi-viewport';
-import { updateAnnotationGraphics } from './updateAnnotationGraphics';
+import { getHandleTypeAtPosition, updateAnnotationGraphics } from './updateAnnotationGraphics';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface AnnotationData {
@@ -356,6 +356,27 @@ export class PixiJSCore {
     // 检查是否点到其他标注上
     if (this.selectedAnnotationId) {
       this.log('Clicked on annotation, not starting new one');
+      const ann = this.annotationStates.get(this.selectedAnnotationId);
+      if (ann) {
+        const { x, y } = this.screenToWorld(event.global.x, event.global.y);
+        const handle = getHandleTypeAtPosition(
+          x,
+          y,
+          ann
+        );
+        if (handle) {
+          this.isResizing = true;
+          this.resizeHandle = handle;
+          this.originalPosition = {
+            x: ann.x,
+            y: ann.y,
+            width: ann.width,
+            height: ann.height,
+          };
+          this.dragStart = { x: event.global.x, y: event.global.y };
+        }
+      }
+
       return;
     }
 
@@ -404,6 +425,24 @@ export class PixiJSCore {
     graphics.stroke({ color: 0x3b82f6, width: 2 });
   }
 
+  screenToWorld(screenX: number, screenY: number): { x: number; y: number } {
+    if (!this.viewport) {
+      return { x: screenX, y: screenY };
+    }
+    const scaleX = this.viewport?.worldTransform.a ?? 1;
+    const scaleY = this.viewport?.worldTransform.d ?? 1;
+    const spriteX = this.viewport?.worldTransform.tx ?? 0;
+    const spriteY = this.viewport?.worldTransform.ty ?? 0;
+    this.drawStart = null;
+    if (this.drawingRect) {
+      this.drawingRect.clear();
+    }
+    const x = (screenX - spriteX) / scaleX;
+    const y = (screenY - spriteY) / scaleY;
+
+    return { x, y };
+  }
+
   /**
    * 处理鼠标释放（创建新标注）
    */
@@ -415,28 +454,31 @@ export class PixiJSCore {
     const sprite = this.imageSprite;
     if (!sprite) return;
 
+    const drawStart = this.drawStart;
     const globalX = event.global.x;
     const globalY = event.global.y;
     const scaleX = this.viewport?.worldTransform.a ?? 1;
     const scaleY = this.viewport?.worldTransform.d ?? 1;
     const spriteX = this.viewport?.worldTransform.tx ?? 0;
     const spriteY = this.viewport?.worldTransform.ty ?? 0;
-
-    const width = Math.abs(globalX - this.drawStart.x) / scaleX;
-    const height = Math.abs(globalY - this.drawStart.y) / scaleY;
+    this.drawStart = null;
+    if (this.drawingRect) {
+      this.drawingRect.clear();
+    }
+    const width = Math.abs(globalX - drawStart.x) / scaleX;
+    const height = Math.abs(globalY - drawStart.y) / scaleY;
+    const x = (Math.min(drawStart.x, event.global.x) - spriteX) / scaleX;
+    const y = (Math.min(drawStart.y, event.global.y) - spriteY) / scaleY;
 
     // 忽略太小的矩形
     if (width < 10 || height < 10) {
-      this.drawStart = null;
-      if (this.drawingRect) {
-        this.drawingRect.clear();
-      }
+
+      // 检查是否点击在已有标注上
+      this.checkSelectAnnotation(x, y);
       return;
     }
 
     // 创建新标注
-    const x = (Math.min(this.drawStart.x, event.global.x) - spriteX) / scaleX;
-    const y = (Math.min(this.drawStart.y, event.global.y) - spriteY) / scaleY;
     const id = uuidv4();
     const label = `Annotation ${this.annotationStates.size + 1}`;
 
@@ -449,10 +491,19 @@ export class PixiJSCore {
       name: label,
       rect: { x, y, width, height },
     });
+  }
 
-    this.drawStart = null;
-    if (this.drawingRect) {
-      this.drawingRect.clear();
+  checkSelectAnnotation(x: number, y: number): void {
+    for (const [id, ann] of this.annotationStates.entries()) {
+      if (
+        x >= ann.x &&
+        x <= ann.x + ann.width &&
+        y >= ann.y &&
+        y <= ann.y + ann.height
+      ) {
+        this.selectAnnotation(id, ann.label);
+        return;
+      }
     }
   }
 
