@@ -182,7 +182,6 @@ export default function PixiJSAnnotationEditor({
 
       const event = { global: { x, y } } as unknown as any;
       pixiCoreRef.current.handleMouseUp(event);
-      pixiCoreRef.current.handleAnnotationPointerUp();
     };
 
     window.addEventListener('mousemove', handleGlobalMouseMove);

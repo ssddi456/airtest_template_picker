@@ -51,8 +51,7 @@ export class PixiJSCore {
 
   // 交互状态
   private _isDrawing = false;
-  private _drawStart: { x: number; y: number } | null = null;
-  private isDragging = false;
+  private _dragStart: { x: number; y: number } | null = null;
 
   get isDrawing(): boolean {
     return this._isDrawing;
@@ -63,20 +62,24 @@ export class PixiJSCore {
     this.log('isDrawing changed to:', value);
   }
 
-  get drawStart(): { x: number; y: number } | null {
-    return this._drawStart;
+  get dragStart(): { x: number; y: number } | null {
+    return this._dragStart;
   }
 
-  set drawStart(value: { x: number; y: number } | null) {
-    this._drawStart = value;
-    this.log('drawStart changed to:', value);
+  set dragStart(value: { x: number; y: number } | null) {
+    this._dragStart = value;
+    this.log('dragStart changed to:', value);
   }
 
   private isResizing = false;
-  private dragStart: { x: number; y: number } | null = null;
   private originalPosition: { x: number; y: number; width: number; height: number } | null = null;
   private selectedAnnotationId: string | null = null;
   private resizeHandle: HandleType | null = null;
+
+  // 拖拽阈值相关状态
+  private dragThreshold = 5; // 拖拽阈值（像素）
+  private isDraggingAnnotation = false; // 是否正在进行拖拽
+  private dragStartPosition: { x: number; y: number } | null = null; // 拖拽起始位置（世界坐标）
 
   private mouseMode = MouseMode.select;
 
@@ -223,7 +226,6 @@ export class PixiJSCore {
     if (e.code === 'Space') {
       e.preventDefault();
       if (e.repeat === false) {
-        this.isDragging = false;
         this.log('Space key pressed - switching to move mode');
         this.viewport!.plugins.resume('drag');
         this.viewport!.cursor = 'grab';
@@ -242,7 +244,7 @@ export class PixiJSCore {
     } else if (e.code === 'Escape') {
       e.preventDefault();
       this.isDrawing = false;
-      this.drawStart = null;
+      this.dragStart = null;
       if (this.drawingRect) {
         this.drawingRect.clear();
       }
@@ -374,15 +376,39 @@ export class PixiJSCore {
             height: ann.height,
           };
           this.dragStart = { x: event.global.x, y: event.global.y };
+          // 记录拖拽起始位置（世界坐标）
+          this.dragStartPosition = { x, y };
+          this.isDraggingAnnotation = false; // 重置拖拽标记
+          return;
+        } 
+        
+        if (
+          x >= ann.x &&
+          x <= ann.x + ann.width &&
+          y >= ann.y &&
+          y <= ann.y + ann.height
+        ) {
+          // 点击在 annotation 内部（非手柄），准备拖拽
+          this.dragStart = { x: event.global.x, y: event.global.y };
+          this.originalPosition = {
+            x: ann.x,
+            y: ann.y,
+            width: ann.width,
+            height: ann.height,
+          };
+          // 记录拖拽起始位置（世界坐标）
+          this.dragStartPosition = { x, y };
+          this.isDraggingAnnotation = false; // 重置拖拽标记
+          this.log('Annotation clicked, ready to drag');
+          return;
         }
       }
 
-      return;
     }
 
       // 开始绘制
     this.isDrawing = true;
-    this.drawStart = { x: event.global.x, y: event.global.y };
+    this.dragStart = { x: event.global.x, y: event.global.y };
 
     // 清除绘制矩形
     if (this.drawingRect) {
@@ -395,13 +421,13 @@ export class PixiJSCore {
    * 处理鼠标移动（绘制）
    */
   handleMouseMove(event: PIXI.FederatedPointerEvent): void {
-    if (!this.isDrawing || !this.drawStart || !this.drawingRect) return;
+    if (!this.isDrawing || !this.dragStart || !this.drawingRect) return;
     
     const sprite = this.imageSprite;
     if (!sprite) return;
 
     this.log('Global mouse move:', event.global.x, event.global.y);
-    this.log('Is drawing:', this, this.isDrawing, 'Draw start:', this.drawStart);
+    this.log('Is drawing:', this, this.isDrawing, 'Draw start:', this.dragStart);
 
     const globalX = event.global.x;
     const globalY = event.global.y;
@@ -410,10 +436,10 @@ export class PixiJSCore {
     graphics.clear();
     graphics.fillStyle = 0x3b82f6;
     // 绘制正在绘制的矩形
-    const x = Math.min(this.drawStart.x, globalX);
-    const y = Math.min(this.drawStart.y, globalY);
-    const width = Math.abs(globalX - this.drawStart.x);
-    const height = Math.abs(globalY - this.drawStart.y);
+    const x = Math.min(this.dragStart.x, globalX);
+    const y = Math.min(this.dragStart.y, globalY);
+    const width = Math.abs(globalX - this.dragStart.x);
+    const height = Math.abs(globalY - this.dragStart.y);
 
     graphics.rect(
       x,
@@ -433,7 +459,7 @@ export class PixiJSCore {
     const scaleY = this.viewport?.worldTransform.d ?? 1;
     const spriteX = this.viewport?.worldTransform.tx ?? 0;
     const spriteY = this.viewport?.worldTransform.ty ?? 0;
-    this.drawStart = null;
+    this.dragStart = null;
     if (this.drawingRect) {
       this.drawingRect.clear();
     }
@@ -447,21 +473,18 @@ export class PixiJSCore {
    * 处理鼠标释放（创建新标注）
    */
   handleMouseUp(event: PIXI.FederatedPointerEvent): void {
-    if (!this.isDrawing || !this.drawStart) return;
-
-    this.isDrawing = false;
-
     const sprite = this.imageSprite;
     if (!sprite) return;
+    if (!this.dragStart) return;
 
-    const drawStart = this.drawStart;
+    const drawStart = this.dragStart;
     const globalX = event.global.x;
     const globalY = event.global.y;
     const scaleX = this.viewport?.worldTransform.a ?? 1;
     const scaleY = this.viewport?.worldTransform.d ?? 1;
     const spriteX = this.viewport?.worldTransform.tx ?? 0;
     const spriteY = this.viewport?.worldTransform.ty ?? 0;
-    this.drawStart = null;
+    this.dragStart = null;
     if (this.drawingRect) {
       this.drawingRect.clear();
     }
@@ -474,26 +497,42 @@ export class PixiJSCore {
     if (width < 10 || height < 10) {
 
       // 检查是否点击在已有标注上
-      this.checkSelectAnnotation(x, y);
-      return;
+      const clickedAnnotation = this.checkSelectAnnotation(x, y);
+      // 如果点击在 annotation 之外，清除选中状态
+      if (!clickedAnnotation && this.selectedAnnotationId) {
+        this.log('Clicked outside annotation, clearing selection');
+        this.callbacks.onAnnotationSelected?.('', '');
+        this.selectedAnnotationId = null;
+        this.annotationStates.forEach((ann) => {
+          if (ann.pixiContainer) {
+            const rectGraphics = ann.pixiContainer.getChildAt(0) as PIXI.Graphics;
+            if (rectGraphics) {
+              updateAnnotationGraphics(rectGraphics, false, ann.width, ann.height);
+            }
+          }
+        });
+      }
+    } else if (this.isDrawing){
+      // 创建新标注
+      const id = uuidv4();
+      const label = `Annotation ${this.annotationStates.size + 1}`;
+  
+      // 选中新标注
+      this.selectAnnotation(id, label);
+  
+      // 通知 React 新标注已创建
+      this.callbacks.onAnnotationCreated?.({
+        id,
+        name: label,
+        rect: { x, y, width, height },
+      });
     }
 
-    // 创建新标注
-    const id = uuidv4();
-    const label = `Annotation ${this.annotationStates.size + 1}`;
+    this.clearDrawingStat();
 
-    // 选中新标注
-    this.selectAnnotation(id, label);
-
-    // 通知 React 新标注已创建
-    this.callbacks.onAnnotationCreated?.({
-      id,
-      name: label,
-      rect: { x, y, width, height },
-    });
   }
 
-  checkSelectAnnotation(x: number, y: number): void {
+  checkSelectAnnotation(x: number, y: number): boolean {
     for (const [id, ann] of this.annotationStates.entries()) {
       if (
         x >= ann.x &&
@@ -502,9 +541,10 @@ export class PixiJSCore {
         y <= ann.y + ann.height
       ) {
         this.selectAnnotation(id, ann.label);
-        return;
+        return true;
       }
     }
+    return false;
   }
 
   /**
@@ -526,6 +566,19 @@ export class PixiJSCore {
     const scaleX = this.viewport?.worldTransform.a ?? 1;
     const scaleY = this.viewport?.worldTransform.d ?? 1;
 
+    const currentWorldPos = this.screenToWorld(globalX, globalY);
+
+    // 检查移动距离是否超过阈值
+    if (this.dragStartPosition && !this.isDraggingAnnotation) {
+      const dx = currentWorldPos.x - this.dragStartPosition.x;
+      const dy = currentWorldPos.y - this.dragStartPosition.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance > this.dragThreshold) {
+        this.isDraggingAnnotation = true;
+        this.log('Drag threshold exceeded, starting drag');
+      }
+    }
 
     if (this.isResizing && this.originalPosition) {
       // 调整大小
@@ -569,12 +622,26 @@ export class PixiJSCore {
           newHeight = Math.max(20, this.originalPosition.height - dy);
           break;
         default:
-          this.updateAnnotationPosition(annotationId, ann.x + dx, ann.y + dy, ann.width, ann.height);
+          // 移动 annotation
+          if (this.isDraggingAnnotation) {
+            const dx = (globalX - this.dragStart!.x) / scaleX;
+            const dy = (globalY - this.dragStart!.y) / scaleY;
+            this.updateAnnotationPosition(annotationId, ann.x + dx, ann.y + dy, ann.width, ann.height);
+          }
           return;
       }
-      // 更新标注
-      this.updateAnnotationPosition(annotationId, newX, newY, newWidth, newHeight);
-    } 
+      // 更新标注（调整大小）
+      if (this.isDraggingAnnotation) {
+        this.updateAnnotationPosition(annotationId, newX, newY, newWidth, newHeight);
+      }
+    } else {
+      // 移动 annotation
+      if (this.isDraggingAnnotation && this.dragStart) {
+        const dx = (globalX - this.dragStart.x) / scaleX;
+        const dy = (globalY - this.dragStart.y) / scaleY;
+        this.updateAnnotationPosition(annotationId, ann.x + dx, ann.y + dy, ann.width, ann.height);
+      }
+    }
   }
 
   /**
@@ -621,13 +688,13 @@ export class PixiJSCore {
   /**
    * 处理指针释放
    */
-  handleAnnotationPointerUp(): void {
-    this.isDragging = false;
+  clearDrawingStat(): void {
     this.isResizing = false;
-    this.selectedAnnotationId = null;
     this.resizeHandle = null;
     this.originalPosition = null;
     this.dragStart = null;
+    this.isDraggingAnnotation = false;
+    this.dragStartPosition = null;
   }
 
   /**
@@ -657,6 +724,7 @@ export class PixiJSCore {
       ann.pixiContainer.parent?.removeChild(ann.pixiContainer);
     }
     this.annotationStates.delete(id);
+    this.selectedAnnotationId = null;
   }
 
   /**
