@@ -160,7 +160,7 @@ export class PixiJSCore {
           .decelerate({
             friction: 0.95,
           });
-        
+
         viewport.plugins.pause('drag');
 
         app.stage.addChild(viewport);
@@ -180,7 +180,7 @@ export class PixiJSCore {
         this.drawingRect = graphics;
 
         // app basic layers created
-        
+
         // 设置画布点击事件
         this.setupCanvasEvents();
 
@@ -212,9 +212,6 @@ export class PixiJSCore {
     this.app.stage.eventMode = 'static';
     this.app.stage.hitArea = this.app.screen;
     this.app.stage.on('pointerdown', event => this.handleCanvasClick(event));
-    this.app.stage.on('pointermove', (event: PIXI.FederatedPointerEvent) => {
-      this.handleAnnotationPointerMove(event, this.selectedAnnotationId);
-    });
 
     window.addEventListener('keydown', this.handleSpaceKeyDown);
 
@@ -231,7 +228,7 @@ export class PixiJSCore {
         this.viewport!.cursor = 'grab';
         this.mouseMode = MouseMode.move;
       }
-    } 
+    }
   }
 
   handleSpaceKeyUp = (e: KeyboardEvent): void => {
@@ -380,8 +377,8 @@ export class PixiJSCore {
           this.dragStartPosition = { x, y };
           this.isDraggingAnnotation = false; // 重置拖拽标记
           return;
-        } 
-        
+        }
+
         if (
           x >= ann.x &&
           x <= ann.x + ann.width &&
@@ -406,7 +403,7 @@ export class PixiJSCore {
 
     }
 
-      // 开始绘制
+    // 开始绘制
     this.isDrawing = true;
     this.dragStart = { x: event.global.x, y: event.global.y };
 
@@ -417,14 +414,23 @@ export class PixiJSCore {
 
   }
 
+  handleMouseMove(event: PIXI.FederatedPointerEvent): void {
+    const sprite = this.imageSprite;
+    if (!sprite) return;
+    if (!this.dragStart) return;
+
+    if (this.isDrawing) {
+      this.handleMouseMoveDraw(event);
+    } else {
+      this.handleAnnotationPointerMove(event, this.selectedAnnotationId);
+    }
+  }
+
   /**
    * 处理鼠标移动（绘制）
    */
-  handleMouseMove(event: PIXI.FederatedPointerEvent): void {
+  handleMouseMoveDraw(event: PIXI.FederatedPointerEvent): void {
     if (!this.isDrawing || !this.dragStart || !this.drawingRect) return;
-    
-    const sprite = this.imageSprite;
-    if (!sprite) return;
 
     this.log('Global mouse move:', event.global.x, event.global.y);
     this.log('Is drawing:', this, this.isDrawing, 'Draw start:', this.dragStart);
@@ -445,7 +451,7 @@ export class PixiJSCore {
       x,
       y,
       width,
-      height 
+      height
     );
     console.log('Drawing rectangle at:', x, y, width, height);
     graphics.stroke({ color: 0x3b82f6, width: 2 });
@@ -459,7 +465,6 @@ export class PixiJSCore {
     const scaleY = this.viewport?.worldTransform.d ?? 1;
     const spriteX = this.viewport?.worldTransform.tx ?? 0;
     const spriteY = this.viewport?.worldTransform.ty ?? 0;
-    this.dragStart = null;
     if (this.drawingRect) {
       this.drawingRect.clear();
     }
@@ -494,7 +499,7 @@ export class PixiJSCore {
     const y = (Math.min(drawStart.y, event.global.y) - spriteY) / scaleY;
 
     // 忽略太小的矩形
-    if (width < 10 || height < 10) {
+    if (width < 10 && height < 10) {
 
       // 检查是否点击在已有标注上
       const clickedAnnotation = this.checkSelectAnnotation(x, y);
@@ -512,20 +517,28 @@ export class PixiJSCore {
           }
         });
       }
-    } else if (this.isDrawing){
+    } else if (this.isDrawing) {
       // 创建新标注
       const id = uuidv4();
       const label = `Annotation ${this.annotationStates.size + 1}`;
-  
+
       // 选中新标注
       this.selectAnnotation(id, label);
-  
+
       // 通知 React 新标注已创建
       this.callbacks.onAnnotationCreated?.({
         id,
         name: label,
         rect: { x, y, width, height },
       });
+    } else if (this.selectedAnnotationId) {
+      const ann = this.annotationStates.get(this.selectedAnnotationId);
+      if (!ann) return;
+
+       // 更新标注位置和大小
+      // 通知 React 标注已更新
+      this.callbacks.onAnnotationUpdated?.(this.selectedAnnotationId, { x: ann.x, y: ann.y, width: ann.width, height: ann.height });
+
     }
 
     this.clearDrawingStat();
@@ -559,8 +572,6 @@ export class PixiJSCore {
     const sprite = this.imageSprite;
     if (!sprite || !this.originalPosition) return;
 
-    event.stopPropagation();
-
     const globalX = event.global.x;
     const globalY = event.global.y;
     const scaleX = this.viewport?.worldTransform.a ?? 1;
@@ -593,40 +604,50 @@ export class PixiJSCore {
 
       switch (handle) {
         case 'nw':
+          newX = this.originalPosition.x + dx;
+          newY = this.originalPosition.y + dy;
+          newWidth = Math.max(20, this.originalPosition.width - dx);
+          newHeight = Math.max(20, this.originalPosition.height - dy);
+          break;
+        case 'n':
+          newY = this.originalPosition.y + dy;
+          newHeight = Math.max(20, this.originalPosition.height - dy);
+          break;
+        case 'ne':
+          newY = this.originalPosition.y + dy;
+          newWidth = Math.max(20, this.originalPosition.width + dx);
+          newHeight = Math.max(20, this.originalPosition.height - dy);
+          break;
+        case 'e':
+          newWidth = Math.max(20, this.originalPosition.width + dx);
+          break;
+        case 'se':
           newWidth = Math.max(20, this.originalPosition.width + dx);
           newHeight = Math.max(20, this.originalPosition.height + dy);
           break;
-        case 'n':
-          newHeight = Math.max(20, this.originalPosition.height + dy);
-          break;
-        case 'ne':
-          newWidth = Math.max(20, this.originalPosition.width - dx);
-          newHeight = Math.max(20, this.originalPosition.height + dy);
-          break;
-        case 'e':
-          newWidth = Math.max(20, this.originalPosition.width - dx);
-          break;
-        case 'se':
-          newWidth = Math.max(20, this.originalPosition.width - dx);
-          newHeight = Math.max(20, this.originalPosition.height - dy);
-          break;
         case 's':
-          newHeight = Math.max(20, this.originalPosition.height - dy);
+          newHeight = Math.max(20, this.originalPosition.height + dy);
           break;
         case 'sw':
           newX = this.originalPosition.x + dx;
-          newHeight = Math.max(20, this.originalPosition.height - dy);
+          newHeight = Math.max(20, this.originalPosition.height + dy);
+          newWidth = Math.max(20, this.originalPosition.width - dx);
           break;
         case 'w':
           newX = this.originalPosition.x + dx;
-          newHeight = Math.max(20, this.originalPosition.height - dy);
+          newWidth = Math.max(20, this.originalPosition.width - dx);
           break;
         default:
           // 移动 annotation
           if (this.isDraggingAnnotation) {
             const dx = (globalX - this.dragStart!.x) / scaleX;
             const dy = (globalY - this.dragStart!.y) / scaleY;
-            this.updateAnnotationPosition(annotationId, ann.x + dx, ann.y + dy, ann.width, ann.height);
+            this.updateAnnotationPosition(annotationId,
+              this.originalPosition.x + dx,
+              this.originalPosition.y + dy,
+              this.originalPosition.width,
+              this.originalPosition.height,
+            );
           }
           return;
       }
@@ -639,7 +660,12 @@ export class PixiJSCore {
       if (this.isDraggingAnnotation && this.dragStart) {
         const dx = (globalX - this.dragStart.x) / scaleX;
         const dy = (globalY - this.dragStart.y) / scaleY;
-        this.updateAnnotationPosition(annotationId, ann.x + dx, ann.y + dy, ann.width, ann.height);
+        this.updateAnnotationPosition(annotationId,
+          this.originalPosition.x + dx,
+          this.originalPosition.y + dy,
+          this.originalPosition.width,
+          this.originalPosition.height,
+        );
       }
     }
   }
@@ -681,14 +707,13 @@ export class PixiJSCore {
       updateAnnotationGraphics(rectGraphics, true, newWidth, newHeight);
     }
 
-    // 通知 React 标注已更新
-    this.callbacks.onAnnotationUpdated?.(id, { x: newX, y: newY, width: newWidth, height: newHeight });
   }
 
   /**
    * 处理指针释放
    */
   clearDrawingStat(): void {
+    this.isDrawing = false;
     this.isResizing = false;
     this.resizeHandle = null;
     this.originalPosition = null;
@@ -757,7 +782,7 @@ export class PixiJSCore {
    */
   resetView(): void {
     if (!this.viewport) return;
-    
+
     // 重置缩放和位置到初始状态
     this.viewport.fit();
     this.viewport.moveCorner(0, 0);
@@ -777,7 +802,7 @@ export class PixiJSCore {
     this.drawingRect = null;
     this.annotationStates.clear();
 
-    window.removeEventListener('keydown', this.handleSpaceKeyDown);  
+    window.removeEventListener('keydown', this.handleSpaceKeyDown);
     window.removeEventListener('keyup', this.handleSpaceKeyUp);
   }
 }
